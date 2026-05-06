@@ -70,11 +70,19 @@ Never commit `.env` or your local SQLite database. They are ignored by the inclu
 
 ### Database
 
-Run the Prisma migration:
+Run the Prisma migration in development:
 
 ```bash
 npx prisma migrate dev
 ```
+
+For production or a hosted container, apply the committed migrations before starting the server:
+
+```bash
+npm run db:deploy
+```
+
+`npm run start` runs this deploy step automatically. If your host starts the app with `node server.js --production` directly, run `npm run db:deploy` once first or change the startup command to `npm run start`.
 
 If you want to wipe your local database back to a clean, empty state, run:
 
@@ -107,9 +115,10 @@ After running your migrations:
 | --- | --- |
 | `npm run dev` | Start the custom Next.js and Socket.IO development server. |
 | `npm run build` | Build the app for production. |
-| `npm run start` | Start the production server. |
+| `npm run start` | Apply production migrations, then start the production server. |
 | `npm run postinstall` | Generate the Prisma client after install. |
 | `npm run db:migrate` | Run Prisma migrations in development. |
+| `npm run db:deploy` | Apply committed migrations in production or hosted containers. |
 | `npm run db:seed` | Clear the local database back to an empty, ready-to-register state. |
 | `npm run db:reset` | Reset the database, re-apply migrations, and clear it to the same empty state. |
 
