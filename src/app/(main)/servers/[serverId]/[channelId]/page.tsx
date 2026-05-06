@@ -28,8 +28,9 @@ export default async function ChannelPage({ params }: Props) {
     where: { channelId: params.channelId, deleted: false },
     include: {
       user: true,
+      bot: true,
       reactions: { include: { user: true } },
-      replyTo: { include: { user: true } },
+      replyTo: { include: { user: true, bot: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -37,7 +38,7 @@ export default async function ChannelPage({ params }: Props) {
 
   const pinnedMessages = await prisma.pinnedMessage.findMany({
     where: { channelId: params.channelId },
-    include: { message: { include: { user: true } } },
+    include: { message: { include: { user: true, bot: true } } },
   });
 
   return (

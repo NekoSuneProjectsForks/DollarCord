@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import { useToast } from "@/contexts/ToastContext";
 import { Avatar } from "@/components/ui/Avatar";
+import { UserProfileModal } from "@/components/modals/UserProfileModal";
 import { canBanMember, canChangeRole, canRemoveMember } from "@/lib/serverPermissions";
 import type { MemberRole, ServerMember } from "@/types";
 
@@ -37,6 +38,7 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
   const [search, setSearch] = useState("");
   const [memberList, setMemberList] = useState(sortMembers(members));
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setMemberList(sortMembers(members));
@@ -163,14 +165,38 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                 return (
                   <div
                     key={member.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-dc-hover transition-colors group"
+                    onClick={() => setSelectedUserId(member.userId)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-dc-hover transition-colors group cursor-pointer"
                   >
                     <Avatar user={member.user} size="sm" online={online} />
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-medium truncate ${online ? "text-dc-text" : "text-dc-muted"}`}>
                         {member.user.displayName}
                       </p>
-                      <p className="text-xs text-dc-faint truncate">@{member.user.username}</p>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <p className="text-xs text-dc-faint truncate">@{member.user.username}</p>
+                        {(member.user.twitchChannel || member.user.kickChannel) && (
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-dc-accent">
+                            Stream
+                          </span>
+                        )}
+                      </div>
+                      {member.roles && member.roles.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {member.roles.slice(0, 2).map(({ role }) => (
+                            <span
+                              key={role.id}
+                              className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+                              style={{ color: role.color, backgroundColor: `${role.color}1A` }}
+                            >
+                              {role.name}
+                            </span>
+                          ))}
+                          {member.roles.length > 2 && (
+                            <span className="text-[10px] text-dc-faint">+{member.roles.length - 2}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {role === "OWNER" && (
                       <span className="shrink-0 text-xs text-dc-warning" title="Server Owner">Owner</span>
@@ -182,7 +208,7 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                       <div className="hidden group-hover:flex items-center gap-1 shrink-0">
                         {canPromote && (
                           <button
-                            onClick={() => updateRole(member, "ADMIN")}
+                            onClick={(event) => { event.stopPropagation(); updateRole(member, "ADMIN"); }}
                             disabled={busyKey === `${member.userId}:role:ADMIN`}
                             className="px-2 py-1 rounded text-[11px] font-semibold bg-dc-accent/15 text-dc-accent hover:bg-dc-accent/25 disabled:opacity-50 transition-colors"
                           >
@@ -191,7 +217,7 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                         )}
                         {canDemote && (
                           <button
-                            onClick={() => updateRole(member, "MEMBER")}
+                            onClick={(event) => { event.stopPropagation(); updateRole(member, "MEMBER"); }}
                             disabled={busyKey === `${member.userId}:role:MEMBER`}
                             className="px-2 py-1 rounded text-[11px] font-semibold bg-dc-hover text-dc-text hover:bg-dc-border disabled:opacity-50 transition-colors"
                           >
@@ -200,7 +226,7 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                         )}
                         {canKick && (
                           <button
-                            onClick={() => removeMember(member, "kick")}
+                            onClick={(event) => { event.stopPropagation(); removeMember(member, "kick"); }}
                             disabled={busyKey === `${member.userId}:kick`}
                             className="px-2 py-1 rounded text-[11px] font-semibold bg-dc-warning/15 text-dc-warning hover:bg-dc-warning/25 disabled:opacity-50 transition-colors"
                           >
@@ -209,7 +235,7 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                         )}
                         {canBan && (
                           <button
-                            onClick={() => removeMember(member, "ban")}
+                            onClick={(event) => { event.stopPropagation(); removeMember(member, "ban"); }}
                             disabled={busyKey === `${member.userId}:ban`}
                             className="px-2 py-1 rounded text-[11px] font-semibold bg-dc-danger/15 text-dc-danger hover:bg-dc-danger/25 disabled:opacity-50 transition-colors"
                           >
@@ -229,6 +255,12 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
           <p className="text-dc-muted text-xs px-2">No members found</p>
         )}
       </div>
+      <UserProfileModal
+        open={Boolean(selectedUserId)}
+        onClose={() => setSelectedUserId(null)}
+        userId={selectedUserId}
+        serverId={serverId}
+      />
     </aside>
   );
 }

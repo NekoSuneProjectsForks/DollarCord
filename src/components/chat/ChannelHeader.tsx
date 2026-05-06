@@ -13,6 +13,10 @@ interface Props {
   onSearchChange: (q: string) => void;
 }
 
+function getAuthorName(message: Message) {
+  return message.user?.displayName ?? message.bot?.name ?? "Unknown User";
+}
+
 export function ChannelHeader({ channel, pinnedMessages, canManage, searchQuery, onSearchChange }: Props) {
   const [showSearch, setShowSearch] = useState(false);
   const [showPins, setShowPins] = useState(false);
@@ -86,7 +90,7 @@ export function ChannelHeader({ channel, pinnedMessages, canManage, searchQuery,
             {pinnedMessages.map((msg) => (
               <div key={msg.id} className="bg-dc-chat rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-dc-text text-sm font-semibold">{msg.user.displayName}</span>
+                  <span className="text-dc-text text-sm font-semibold">{getAuthorName(msg)}</span>
                   <span className="text-dc-faint text-xs">
                     {formatShortDate(msg.createdAt)}
                   </span>

@@ -11,9 +11,15 @@ async function main() {
   await prisma.directMessage.deleteMany();
   await prisma.directMessageParticipant.deleteMany();
   await prisma.directMessageThread.deleteMany();
+  await prisma.serverEventParticipant.deleteMany();
+  await prisma.serverEvent.deleteMany();
+  await prisma.serverUserSettings.deleteMany();
+  await prisma.bot.deleteMany();
   await prisma.serverBan.deleteMany();
   await prisma.invite.deleteMany();
   await prisma.channel.deleteMany();
+  await prisma.serverMemberRole.deleteMany();
+  await prisma.serverRole.deleteMany();
   await prisma.serverMember.deleteMany();
   await prisma.server.deleteMany();
   await prisma.session.deleteMany();

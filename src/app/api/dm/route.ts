@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserFromReq } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canUserStartDmWithTarget } from "@/lib/serverSettings";
 import { getIO } from "@/server/socketServer";
 
 // List user's DM threads
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
 
   if (existing) {
     return NextResponse.json({ thread: existing });
+  }
+
+  const dmPrivacy = await canUserStartDmWithTarget(user.id, targetUserId);
+  if (!dmPrivacy.allowed) {
+    return NextResponse.json({ error: dmPrivacy.reason ?? "This user is not accepting DMs from shared servers" }, { status: 403 });
   }
 
   const thread = await prisma.directMessageThread.create({

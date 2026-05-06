@@ -3,23 +3,40 @@
 import { useState, useRef, useEffect } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatTime } from "@/lib/dateTime";
+import { extractMessageEmbeds } from "@/lib/messageEmbeds";
 import type { Message, Reaction } from "@/types";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "🎉", "🔥", "💸"];
 
-/** Minimal markdown renderer: **bold**, *italic*, `code`, ~~strike~~, > blockquote, ```codeblock``` */
-function renderMarkdown(text: string): string {
+function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/~~(.+?)~~/g, "<del>$1</del>")
-    .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/\n/g, "<br/>");
+    .replace(/"/g, "&quot;");
+}
+
+function linkifyUrls(text: string): string {
+  return text.replace(/https?:\/\/[^\s<]+/g, (url) => {
+    const cleanUrl = url.replace(/[.,!?;:]+$/, "");
+    const suffix = url.slice(cleanUrl.length);
+    const href = cleanUrl.replace(/&quot;/g, "%22");
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${suffix}`;
+  });
+}
+
+/** Minimal markdown renderer: **bold**, *italic*, `code`, ~~strike~~, > blockquote, ```codeblock``` */
+function renderMarkdown(text: string): string {
+  return linkifyUrls(
+    escapeHtml(text)
+      .replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/~~(.+?)~~/g, "<del>$1</del>")
+      .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
+      .replace(/\n/g, "<br/>")
+  );
 }
 
 function groupReactions(reactions: Reaction[], currentUserId: string) {
@@ -32,6 +49,19 @@ function groupReactions(reactions: Reaction[], currentUserId: string) {
     });
   }
   return Array.from(groups.entries()).map(([emoji, data]) => ({ emoji, ...data }));
+}
+
+function getAuthor(message: Message) {
+  if (message.user) return { ...message.user, isBot: false };
+  if (message.bot) {
+    return {
+      displayName: message.bot.name,
+      username: message.bot.username,
+      avatarUrl: message.bot.avatarUrl,
+      isBot: true,
+    };
+  }
+  return { displayName: "Unknown User", username: "unknown", avatarUrl: null, isBot: false };
 }
 
 interface Props {
@@ -68,6 +98,8 @@ export function MessageItem({
   const isOwn = message.userId === currentUserId;
   const canEdit = isOwn && !message.deleted;
   const canDelete = (isOwn || canManage) && !message.deleted;
+  const author = getAuthor(message);
+  const embeds = message.deleted ? [] : extractMessageEmbeds(message.content);
 
   useEffect(() => {
     if (editing && editRef.current) {
@@ -98,7 +130,7 @@ export function MessageItem({
       {message.replyTo && !message.deleted && (
         <div className="absolute top-0 left-16 flex items-center gap-1 text-xs text-dc-muted -translate-y-full py-1">
           <span>↩</span>
-          <span className="font-medium text-dc-text">{message.replyTo.user.displayName}</span>
+          <span className="font-medium text-dc-text">{getAuthor(message.replyTo).displayName}</span>
           <span className="truncate max-w-48">{message.replyTo.content}</span>
         </div>
       )}
@@ -113,7 +145,7 @@ export function MessageItem({
           )}
         </div>
       ) : (
-        <Avatar user={message.user} size="sm" className="mt-1 shrink-0" />
+        <Avatar user={author} size="sm" className="mt-1 shrink-0" />
       )}
 
       {/* Content */}
@@ -121,7 +153,12 @@ export function MessageItem({
         {/* Name + timestamp (only for first in group) */}
         {!isConsecutive && (
           <div className="flex items-baseline gap-2 mb-0.5">
-            <span className="font-semibold text-dc-text text-sm">{message.user.displayName}</span>
+            <span className="font-semibold text-dc-text text-sm">{author.displayName}</span>
+            {author.isBot && (
+              <span className="rounded bg-dc-accent px-1 py-0.5 text-[10px] font-bold leading-none text-white">
+                BOT
+              </span>
+            )}
             <span className="text-dc-faint text-xs">{formatTime(message.createdAt)}</span>
             {message.edited && <span className="text-dc-faint text-xs">(edited)</span>}
             {isPinned && <span className="text-dc-accent text-xs font-semibold">Pinned</span>}
@@ -153,6 +190,46 @@ export function MessageItem({
             className="message-content text-sm text-dc-text break-words"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
           />
+        )}
+
+        {embeds.length > 0 && (
+          <div className="mt-2 space-y-2 max-w-xl">
+            {embeds.map((embed) => (
+              <div
+                key={embed.url}
+                className="overflow-hidden rounded border border-dc-border bg-dc-sidebar"
+                style={{ borderLeftColor: embed.color, borderLeftWidth: 4 }}
+              >
+                <div className="p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-dc-muted">{embed.providerName}</p>
+                  <a
+                    href={embed.actionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 block text-sm font-semibold text-dc-text hover:underline"
+                  >
+                    {embed.title}
+                  </a>
+                  {embed.description && (
+                    <p className="mt-1 break-all text-xs text-dc-muted">{embed.description}</p>
+                  )}
+                  <a
+                    href={embed.actionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex rounded bg-dc-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-dc-accent-hover transition-colors"
+                  >
+                    {embed.actionLabel}
+                  </a>
+                </div>
+                {embed.thumbnailUrl && (
+                  <a href={embed.actionUrl} target="_blank" rel="noopener noreferrer" className="block">
+                    <img src={embed.thumbnailUrl} alt="" className="max-h-72 w-full object-cover" />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Reactions */}

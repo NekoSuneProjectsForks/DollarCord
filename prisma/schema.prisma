@@ -16,6 +16,8 @@ model User {
   isPlatformAdmin Boolean  @default(false)
   bio             String?
   avatarUrl       String?
+  twitchChannel   String?
+  kickChannel     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -29,6 +31,10 @@ model User {
   pinnedBy         PinnedMessage[]            @relation("PinnedBy")
   serverBans       ServerBan[]                @relation("ServerBanUser")
   issuedServerBans ServerBan[]                @relation("ServerBanActor")
+  createdBots      Bot[]                      @relation("BotCreator")
+  serverSettings   ServerUserSettings[]
+  createdEvents    ServerEvent[]              @relation("ServerEventCreator")
+  eventRsvps       ServerEventParticipant[]
 }
 
 model Session {
@@ -50,11 +56,42 @@ model Server {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner    User           @relation("ServerOwner", fields: [ownerId], references: [id])
-  members  ServerMember[]
-  channels Channel[]
-  invites  Invite[]
-  bans     ServerBan[]
+  owner        User                 @relation("ServerOwner", fields: [ownerId], references: [id])
+  members      ServerMember[]
+  channels     Channel[]
+  invites      Invite[]
+  bans         ServerBan[]
+  roles        ServerRole[]
+  memberRoles  ServerMemberRole[]
+  bots         Bot[]
+  userSettings ServerUserSettings[]
+  events       ServerEvent[]
+}
+
+model ServerUserSettings {
+  id                      String   @id @default(cuid())
+  serverId                String
+  userId                  String
+  allowDms                Boolean  @default(true)
+  messageRequests         Boolean  @default(false)
+  shareActivity           Boolean  @default(true)
+  activityJoining         Boolean  @default(true)
+  muted                   Boolean  @default(false)
+  notificationLevel       String   @default("ALL_MESSAGES") // ALL_MESSAGES | MENTIONS | NOTHING
+  suppressEveryone        Boolean  @default(false)
+  suppressRoleMentions    Boolean  @default(false)
+  suppressHighlights      Boolean  @default(false)
+  muteNewEvents           Boolean  @default(false)
+  mobilePushNotifications Boolean  @default(true)
+  inAppEventAlerts        Boolean  @default(true)
+  pushEventAlerts         Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId])
 }
 
 model ServerMember {
@@ -64,10 +101,58 @@ model ServerMember {
   role     String   @default("MEMBER") // OWNER | ADMIN | MEMBER
   joinedAt DateTime @default(now())
 
-  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  server Server             @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles  ServerMemberRole[]
 
   @@unique([serverId, userId])
+}
+
+model ServerRole {
+  id        String   @id @default(cuid())
+  serverId  String
+  name      String
+  color     String   @default("#7c6af7")
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  server  Server             @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  members ServerMemberRole[]
+
+  @@unique([serverId, name])
+}
+
+model ServerMemberRole {
+  id        String   @id @default(cuid())
+  serverId  String
+  memberId  String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  server Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  member ServerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role   ServerRole   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, roleId])
+}
+
+model Bot {
+  id        String   @id @default(cuid())
+  serverId  String
+  name      String
+  username  String
+  avatarUrl String?
+  tokenHash String   @unique
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  server   Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  creator  User      @relation("BotCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([serverId, username])
 }
 
 model ServerBan {
@@ -110,12 +195,47 @@ model Channel {
   server         Server          @relation(fields: [serverId], references: [id], onDelete: Cascade)
   messages       Message[]
   pinnedMessages PinnedMessage[]
+  events         ServerEvent[]
+}
+
+model ServerEvent {
+  id          String    @id @default(cuid())
+  serverId    String
+  channelId   String?
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  createdBy   String
+  canceled    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  server       Server                   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channel      Channel?                 @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  creator      User                     @relation("ServerEventCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  participants ServerEventParticipant[]
+}
+
+model ServerEventParticipant {
+  id       String   @id @default(cuid())
+  eventId  String
+  userId   String
+  notify   Boolean  @default(true)
+  joinedAt DateTime @default(now())
+
+  event ServerEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
 }
 
 model Message {
   id        String   @id @default(cuid())
   channelId String
-  userId    String
+  userId    String?
+  botId     String?
   content   String
   edited    Boolean  @default(false)
   deleted   Boolean  @default(false)
@@ -124,7 +244,8 @@ model Message {
   updatedAt DateTime @updatedAt
 
   channel   Channel         @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user      User            @relation(fields: [userId], references: [id])
+  user      User?           @relation(fields: [userId], references: [id])
+  bot       Bot?            @relation(fields: [botId], references: [id])
   replyTo   Message?        @relation("MessageReply", fields: [replyToId], references: [id])
   replies   Message[]       @relation("MessageReply")
   reactions Reaction[]

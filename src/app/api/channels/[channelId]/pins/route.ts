@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const pins = await prisma.pinnedMessage.findMany({
     where: { channelId: params.channelId },
-    include: { message: { include: { user: true } } },
+    include: { message: { include: { user: true, bot: true } } },
     orderBy: { createdAt: "desc" },
   });
 

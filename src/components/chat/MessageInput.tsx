@@ -17,6 +17,10 @@ interface Props {
 
 const QUICK_EMOJIS = ["😀", "😂", "❤️", "👍", "🎉", "🔥", "💸", "✨", "🤔", "😎", "🚀", "💯"];
 
+function getReplyAuthor(message: Message) {
+  return message.user?.displayName ?? message.bot?.name ?? "Unknown User";
+}
+
 export function MessageInput({ channelId, channelName, onSend, replyTo, onCancelReply, socket, isDM }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
@@ -97,7 +101,7 @@ export function MessageInput({ channelId, channelName, onSend, replyTo, onCancel
         <div className="flex items-center justify-between bg-dc-input/50 rounded-t-lg px-3 py-2 border border-dc-border border-b-0 text-xs text-dc-muted">
           <span>
             ↩ Replying to{" "}
-            <span className="font-semibold text-dc-text">{replyTo.user.displayName}</span>
+            <span className="font-semibold text-dc-text">{getReplyAuthor(replyTo)}</span>
             <span className="ml-2 truncate max-w-xs inline-block align-bottom">{replyTo.content}</span>
           </span>
           <button

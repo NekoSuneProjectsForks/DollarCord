@@ -33,8 +33,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     where,
     include: {
       user: true,
+      bot: true,
       reactions: { include: { user: true } },
-      replyTo: { include: { user: true } },
+      replyTo: { include: { user: true, bot: true } },
     },
     orderBy: { createdAt: "desc" },
     take: limit + 1,
@@ -92,8 +93,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
       include: {
         user: true,
+        bot: true,
         reactions: { include: { user: true } },
-        replyTo: { include: { user: true } },
+        replyTo: { include: { user: true, bot: true } },
       },
     });
 

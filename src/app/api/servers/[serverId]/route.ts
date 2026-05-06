@@ -18,7 +18,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     where: { id: params.serverId },
     include: {
       channels: { orderBy: { position: "asc" } },
-      members: { include: { user: true } },
+      members: { include: { user: true, roles: { include: { role: true } } } },
+      roles: { orderBy: [{ position: "asc" }, { createdAt: "asc" }] },
     },
   });
   if (!server) return NextResponse.json({ error: "Not found" }, { status: 404 });

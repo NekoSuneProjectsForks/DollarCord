@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSocket } from "@/contexts/SocketContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/contexts/ToastContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { UserBar } from "./UserBar";
 import { UserSettingsModal } from "@/components/settings/UserSettingsModal";
@@ -19,6 +20,7 @@ export function DMSidebar({ threads: initialThreads, currentUserId }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { socket, presence } = useSocket();
+  const { addToast } = useToast();
   const { user, logout } = useAuth();
   const [threads, setThreads] = useState(initialThreads);
   const [search, setSearch] = useState("");
@@ -65,6 +67,8 @@ export function DMSidebar({ threads: initialThreads, currentUserId }: Props) {
     setSearchResults([]);
     if (data.thread) {
       router.push(`/channels/${data.thread.id}`);
+    } else {
+      addToast(data.error || "Could not start direct message", "error");
     }
   }
 

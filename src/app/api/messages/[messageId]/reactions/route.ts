@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const updatedMessage = await prisma.message.findUnique({
     where: { id: params.messageId },
-    include: { user: true, reactions: { include: { user: true } }, replyTo: { include: { user: true } } },
+    include: { user: true, bot: true, reactions: { include: { user: true } }, replyTo: { include: { user: true, bot: true } } },
   });
 
   try {
@@ -52,7 +52,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const updatedMessage = await prisma.message.findUnique({
     where: { id: params.messageId },
-    include: { user: true, reactions: { include: { user: true } }, replyTo: { include: { user: true } } },
+    include: { user: true, bot: true, reactions: { include: { user: true } }, replyTo: { include: { user: true, bot: true } } },
   });
 
   try {

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const members = await prisma.serverMember.findMany({
     where: { serverId: params.serverId },
-    include: { user: true },
+    include: { user: true, roles: { include: { role: true } } },
     orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
   });
 

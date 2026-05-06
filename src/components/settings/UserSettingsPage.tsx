@@ -18,6 +18,8 @@ export function UserSettingsPage({ user }: Props) {
     displayName: user.displayName,
     bio: user.bio ?? "",
     avatarUrl: user.avatarUrl ?? "",
+    twitchChannel: user.twitchChannel ?? "",
+    kickChannel: user.kickChannel ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "account">("profile");
@@ -37,6 +39,8 @@ export function UserSettingsPage({ user }: Props) {
           displayName: form.displayName || undefined,
           bio: form.bio || null,
           avatarUrl: form.avatarUrl || null,
+          twitchChannel: form.twitchChannel || null,
+          kickChannel: form.kickChannel || null,
         }),
       });
       const data = await res.json();
@@ -141,6 +145,35 @@ export function UserSettingsPage({ user }: Props) {
                     className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
                     placeholder="https://example.com/avatar.jpg"
                   />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-dc-muted uppercase tracking-wide mb-1.5">
+                      Twitch Channel
+                    </label>
+                    <input
+                      type="text"
+                      value={form.twitchChannel}
+                      onChange={(e) => update("twitchChannel", e.target.value)}
+                      maxLength={25}
+                      className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
+                      placeholder="channelname"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-dc-muted uppercase tracking-wide mb-1.5">
+                      Kick Channel
+                    </label>
+                    <input
+                      type="text"
+                      value={form.kickChannel}
+                      onChange={(e) => update("kickChannel", e.target.value)}
+                      maxLength={25}
+                      className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
+                      placeholder="channelname"
+                    />
+                  </div>
                 </div>
 
                 <button

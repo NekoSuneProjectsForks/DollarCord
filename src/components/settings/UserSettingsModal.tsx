@@ -20,6 +20,8 @@ export function UserSettingsModal({ open, onClose, user }: Props) {
     displayName: user.displayName,
     bio: user.bio ?? "",
     avatarUrl: user.avatarUrl ?? "",
+    twitchChannel: user.twitchChannel ?? "",
+    kickChannel: user.kickChannel ?? "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -34,6 +36,8 @@ export function UserSettingsModal({ open, onClose, user }: Props) {
           displayName: form.displayName || undefined,
           bio: form.bio || null,
           avatarUrl: form.avatarUrl || null,
+          twitchChannel: form.twitchChannel || null,
+          kickChannel: form.kickChannel || null,
         }),
       });
       const data = await res.json();
@@ -95,6 +99,30 @@ export function UserSettingsModal({ open, onClose, user }: Props) {
             className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
             placeholder="https://example.com/avatar.png"
           />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-dc-muted uppercase tracking-wide mb-1.5">Twitch Channel</label>
+            <input
+              type="text"
+              value={form.twitchChannel}
+              onChange={(e) => setForm((f) => ({ ...f, twitchChannel: e.target.value }))}
+              maxLength={25}
+              className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
+              placeholder="channelname"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-dc-muted uppercase tracking-wide mb-1.5">Kick Channel</label>
+            <input
+              type="text"
+              value={form.kickChannel}
+              onChange={(e) => setForm((f) => ({ ...f, kickChannel: e.target.value }))}
+              maxLength={25}
+              className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
+              placeholder="channelname"
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-dc-muted hover:text-dc-text transition-colors">Cancel</button>

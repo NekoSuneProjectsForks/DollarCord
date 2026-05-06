@@ -6,6 +6,8 @@ export interface User {
   isPlatformAdmin?: boolean;
   bio: string | null;
   avatarUrl: string | null;
+  twitchChannel?: string | null;
+  kickChannel?: string | null;
   createdAt: Date | string;
   updatedAt?: Date | string;
 }
@@ -27,6 +29,60 @@ export interface ServerMember {
   role: "OWNER" | "ADMIN" | "MEMBER";
   joinedAt: Date | string;
   user: User;
+  roles?: ServerMemberRole[];
+}
+
+export interface ServerRole {
+  id: string;
+  serverId: string;
+  name: string;
+  color: string;
+  position: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ServerMemberRole {
+  id: string;
+  serverId: string;
+  memberId: string;
+  roleId: string;
+  role: ServerRole;
+  createdAt: Date | string;
+}
+
+export interface Bot {
+  id: string;
+  serverId: string;
+  name: string;
+  username: string;
+  avatarUrl: string | null;
+  createdBy: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export type ServerNotificationLevel = "ALL_MESSAGES" | "MENTIONS" | "NOTHING";
+
+export interface ServerUserSettings {
+  id: string;
+  serverId: string;
+  userId: string;
+  allowDms: boolean;
+  messageRequests: boolean;
+  shareActivity: boolean;
+  activityJoining: boolean;
+  muted: boolean;
+  notificationLevel: ServerNotificationLevel;
+  suppressEveryone: boolean;
+  suppressRoleMentions: boolean;
+  suppressHighlights: boolean;
+  muteNewEvents: boolean;
+  mobilePushNotifications: boolean;
+  inAppEventAlerts: boolean;
+  pushEventAlerts: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface ServerBan {
@@ -61,6 +117,35 @@ export interface Channel {
   updatedAt: Date | string;
 }
 
+export interface ServerEventParticipant {
+  id: string;
+  eventId: string;
+  userId: string;
+  notify: boolean;
+  joinedAt: Date | string;
+  user?: User;
+}
+
+export interface ServerEvent {
+  id: string;
+  serverId: string;
+  channelId: string | null;
+  title: string;
+  description: string | null;
+  location: string | null;
+  startsAt: Date | string;
+  endsAt: Date | string | null;
+  createdBy: string;
+  canceled: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  channel?: Channel | null;
+  creator?: User;
+  participants?: ServerEventParticipant[];
+  currentUserParticipant?: ServerEventParticipant | null;
+  participantCount?: number;
+}
+
 export interface Reaction {
   id: string;
   messageId: string;
@@ -73,14 +158,16 @@ export interface Reaction {
 export interface Message {
   id: string;
   channelId: string;
-  userId: string;
+  userId: string | null;
+  botId?: string | null;
   content: string;
   edited: boolean;
   deleted: boolean;
   replyToId: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
-  user: User;
+  user: User | null;
+  bot?: Bot | null;
   reactions: Reaction[];
   replyTo?: Message | null;
 }
@@ -121,6 +208,21 @@ export type MemberRole = "OWNER" | "ADMIN" | "MEMBER";
 export interface ServerWithDetails extends Server {
   members: ServerMember[];
   channels: Channel[];
+  roles?: ServerRole[];
+}
+
+export type LiveStreamProvider = "twitch" | "kick";
+
+export interface LiveStreamStatus {
+  provider: LiveStreamProvider;
+  channel: string;
+  url: string;
+  isLive: boolean;
+  title: string | null;
+  category: string | null;
+  thumbnailUrl: string | null;
+  viewerCount: number | null;
+  startedAt: string | null;
 }
 
 export interface ApiError {

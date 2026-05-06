@@ -55,6 +55,7 @@ export function MessageList({
               prev &&
               !prev.deleted &&
               prev.userId === msg.userId &&
+              prev.botId === msg.botId &&
               new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() < 5 * 60_000;
 
             return (

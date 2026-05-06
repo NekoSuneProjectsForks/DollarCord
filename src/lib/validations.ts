@@ -26,6 +26,20 @@ export const updateProfileSchema = z.object({
   displayName: z.string().min(1).max(64).optional(),
   bio: z.string().max(256, "Bio must be at most 256 characters").nullable().optional(),
   avatarUrl: z.string().url("Invalid URL").nullable().optional(),
+  twitchChannel: z
+    .string()
+    .trim()
+    .max(25, "Twitch channel must be at most 25 characters")
+    .regex(/^[a-zA-Z0-9_]+$/, "Twitch channel can only contain letters, numbers, and underscores")
+    .nullable()
+    .optional(),
+  kickChannel: z
+    .string()
+    .trim()
+    .max(25, "Kick channel must be at most 25 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Kick channel can only contain letters, numbers, underscores, and hyphens")
+    .nullable()
+    .optional(),
 });
 
 export const createServerSchema = z.object({
@@ -88,4 +102,65 @@ export const createInviteSchema = z.object({
 
 export const updateMemberRoleSchema = z.object({
   role: z.enum(["ADMIN", "MEMBER"]),
+});
+
+export const createServerRoleSchema = z.object({
+  name: z.string().trim().min(1, "Role name is required").max(32, "Role name must be at most 32 characters"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Role color must be a hex color").default("#7c6af7"),
+});
+
+export const updateServerRoleSchema = createServerRoleSchema.partial();
+
+export const assignServerRolesSchema = z.object({
+  roleIds: z.array(z.string()).max(25, "Too many roles selected"),
+});
+
+export const createBotSchema = z.object({
+  name: z.string().trim().min(1, "Bot name is required").max(64, "Bot name must be at most 64 characters"),
+  username: z
+    .string()
+    .trim()
+    .min(2, "Bot username must be at least 2 characters")
+    .max(32, "Bot username must be at most 32 characters")
+    .regex(/^[a-zA-Z0-9_.-]+$/, "Bot username can only contain letters, numbers, underscores, dots, and hyphens"),
+  avatarUrl: z.string().url("Invalid avatar URL").nullable().optional(),
+});
+
+export const sendBotMessageSchema = z.object({
+  channelId: z.string().min(1, "channelId required"),
+  content: z.string().min(1, "Message cannot be empty").max(4000, "Message is too long"),
+});
+
+export const updateServerUserSettingsSchema = z.object({
+  allowDms: z.boolean().optional(),
+  messageRequests: z.boolean().optional(),
+  shareActivity: z.boolean().optional(),
+  activityJoining: z.boolean().optional(),
+  muted: z.boolean().optional(),
+  notificationLevel: z.enum(["ALL_MESSAGES", "MENTIONS", "NOTHING"]).optional(),
+  suppressEveryone: z.boolean().optional(),
+  suppressRoleMentions: z.boolean().optional(),
+  suppressHighlights: z.boolean().optional(),
+  muteNewEvents: z.boolean().optional(),
+  mobilePushNotifications: z.boolean().optional(),
+  inAppEventAlerts: z.boolean().optional(),
+  pushEventAlerts: z.boolean().optional(),
+});
+
+export const createServerEventSchema = z.object({
+  title: z.string().trim().min(1, "Event title is required").max(100, "Event title must be at most 100 characters"),
+  description: z.string().trim().max(1000, "Description must be at most 1000 characters").nullable().optional(),
+  location: z.string().trim().max(120, "Location must be at most 120 characters").nullable().optional(),
+  channelId: z.string().nullable().optional(),
+  startsAt: z.string().datetime("Start time must be a valid date"),
+  endsAt: z.string().datetime("End time must be a valid date").nullable().optional(),
+});
+
+export const updateServerEventParticipantSchema = z.object({
+  notify: z.boolean(),
+});
+
+export const importDiscordTemplateSchema = z.object({
+  template: z.string().trim().min(1, "Discord template link or code is required").max(300),
+  importServerName: z.boolean().default(false).optional(),
 });

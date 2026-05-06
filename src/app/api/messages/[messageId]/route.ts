@@ -12,9 +12,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const message = await prisma.message.findUnique({
     where: { id: params.messageId },
-    include: { user: true, reactions: { include: { user: true } }, replyTo: { include: { user: true } } },
+    include: { user: true, bot: true, reactions: { include: { user: true } }, replyTo: { include: { user: true, bot: true } } },
   });
   if (!message || message.deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (message.botId) return NextResponse.json({ error: "Bot messages cannot be edited here" }, { status: 403 });
   if (message.userId !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
@@ -26,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const updated = await prisma.message.update({
     where: { id: params.messageId },
     data: { content: parsed.data.content, edited: true },
-    include: { user: true, reactions: { include: { user: true } }, replyTo: { include: { user: true } } },
+    include: { user: true, bot: true, reactions: { include: { user: true } }, replyTo: { include: { user: true, bot: true } } },
   });
 
   try {
