@@ -103,7 +103,12 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
       });
       const data = await res.json();
       if (!res.ok) { addToast(data.error || "Failed to apply template", "error"); return; }
-      addToast(`Applied: ${data.createdChannels} channels, ${data.createdCategories} categories, ${data.createdRoles} roles.`, "success");
+      addToast(
+        `Applied: ${data.createdChannels} channels, ${data.createdCategories} categories, ${data.createdRoles} roles` +
+          (data.createdThreads ? `, ${data.createdThreads} threads` : "") +
+          ".",
+        "success"
+      );
       router.refresh();
     } catch {
       addToast("Could not read that template file.", "error");

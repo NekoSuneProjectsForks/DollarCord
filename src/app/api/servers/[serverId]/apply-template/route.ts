@@ -18,6 +18,7 @@ const templateSchema = z.object({
         type: z.string().optional(),
         nsfw: z.boolean().optional(),
         category: z.string().nullable().optional(),
+        threads: z.array(z.string()).optional(),
       })
     )
     .optional(),
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   let channelPos = existingChannels.length;
+  let createdThreads = 0;
   const createdChannels = [];
   for (const ch of tpl.channels ?? []) {
     const name = normalizeChannelName(ch.name);
@@ -80,6 +82,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
     createdChannels.push(created);
+
+    // Recreate threads under this channel (text-capable channels only).
+    if (created.type !== "VOICE") {
+      for (const threadName of (ch.threads ?? []).slice(0, 50)) {
+        const tn = threadName.trim().slice(0, 100);
+        if (!tn) continue;
+        await prisma.thread.create({
+          data: { channelId: created.id, name: tn, createdBy: user.id },
+        });
+        createdThreads++;
+      }
+    }
   }
 
   let rolePos = existingRoles.length;
@@ -116,5 +130,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     createdCategories,
     createdChannels: createdChannels.length,
     createdRoles,
+    createdThreads,
   });
 }

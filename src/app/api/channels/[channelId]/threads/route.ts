@@ -27,11 +27,20 @@ export async function GET(req: NextRequest, { params }: Params) {
   const threads = await prisma.thread.findMany({
     where: { channelId: params.channelId },
     orderBy: { lastMessageAt: "desc" },
-    include: { _count: { select: { messages: true } } },
+    include: {
+      _count: { select: { messages: true } },
+      readStates: { where: { userId: user.id }, select: { lastReadAt: true } },
+    },
     take: 100,
   });
 
-  return NextResponse.json({ threads });
+  const withUnread = threads.map(({ readStates, ...t }) => {
+    const lastRead = readStates[0]?.lastReadAt;
+    const unread = (t._count.messages ?? 0) > 0 && (!lastRead || t.lastMessageAt > lastRead);
+    return { ...t, unread };
+  });
+
+  return NextResponse.json({ threads: withUnread });
 }
 
 export async function POST(req: NextRequest, { params }: Params) {

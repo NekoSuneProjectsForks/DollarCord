@@ -74,7 +74,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   await prisma.thread.update({ where: { id: params.threadId }, data: { lastMessageAt: new Date() } });
 
   try {
-    getIO().to(`thread:${params.threadId}`).emit("thread:message", message);
+    const io = getIO();
+    io.to(`thread:${params.threadId}`).emit("thread:message", message);
+    // Let thread lists (in the channel's server) flag this thread unread.
+    io.to(`server:${guard.thread.channel.serverId}`).emit("channel:thread:activity", {
+      channelId: guard.thread.channelId,
+      threadId: params.threadId,
+      authorId: user.id,
+    });
   } catch {}
 
   return NextResponse.json({ message }, { status: 201 });

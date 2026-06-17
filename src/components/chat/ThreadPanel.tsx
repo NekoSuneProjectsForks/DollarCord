@@ -15,6 +15,7 @@ interface ThreadSummary {
   rootMessageId: string | null;
   lastMessageAt: string;
   createdAt: string;
+  unread?: boolean;
   _count?: { messages: number };
 }
 
@@ -69,15 +70,19 @@ export function ThreadPanel({ channelId, serverId, currentUser, initialThreadId,
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setMessages(d.messages ?? []))
       .catch(() => {});
+    // Mark read + clear the local unread dot.
+    fetch(`/api/threads/${t.id}/read`, { method: "POST" }).catch(() => {});
+    setThreads((prev) => prev.map((x) => (x.id === t.id ? { ...x, unread: false } : x)));
   }
 
-  // Real-time thread messages.
+  // Real-time thread messages for the open thread.
   useEffect(() => {
     if (!socket || !active) return;
     socket.emit("thread:join", active.id);
     const onMsg = (msg: Message) => {
       if (msg.threadId !== active.id) return;
       setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+      fetch(`/api/threads/${active.id}/read`, { method: "POST" }).catch(() => {});
     };
     socket.on("thread:message", onMsg);
     return () => {
@@ -85,6 +90,17 @@ export function ThreadPanel({ channelId, serverId, currentUser, initialThreadId,
       socket.emit("thread:leave", active.id);
     };
   }, [socket, active]);
+
+  // Flag threads unread in the list when activity arrives for one we're not viewing.
+  useEffect(() => {
+    if (!socket) return;
+    const onActivity = ({ channelId: ch, threadId, authorId }: { channelId: string; threadId: string; authorId: string }) => {
+      if (ch !== channelId || authorId === currentUser.id || threadId === active?.id) return;
+      setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unread: true } : t)));
+    };
+    socket.on("channel:thread:activity", onActivity);
+    return () => { socket.off("channel:thread:activity", onActivity); };
+  }, [socket, channelId, active, currentUser.id]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -174,7 +190,10 @@ export function ThreadPanel({ channelId, serverId, currentUser, initialThreadId,
                 onClick={() => openThread(t)}
                 className="block w-full rounded px-3 py-2 text-left hover:bg-dc-hover transition-colors"
               >
-                <p className="text-sm font-semibold text-dc-text truncate">🧵 {t.name}</p>
+                <p className={`text-sm truncate flex items-center gap-1.5 ${t.unread ? "font-bold text-dc-text" : "font-semibold text-dc-text"}`}>
+                  {t.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-dc-danger" />}
+                  🧵 {t.name}
+                </p>
                 <p className="text-xs text-dc-faint">
                   {t._count?.messages ?? 0} message{(t._count?.messages ?? 0) === 1 ? "" : "s"} · {formatShortDate(t.lastMessageAt)}
                 </p>

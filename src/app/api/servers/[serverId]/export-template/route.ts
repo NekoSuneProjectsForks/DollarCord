@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     where: { id: params.serverId },
     include: {
       categories: { orderBy: { position: "asc" } },
-      channels: { orderBy: { position: "asc" } },
+      channels: { orderBy: { position: "asc" }, include: { threads: { orderBy: { createdAt: "asc" }, select: { name: true } } } },
       roles: { orderBy: { position: "asc" } },
     },
   });
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       nsfw: c.nsfw,
       position: c.position,
       category: c.categoryId ? categoryName.get(c.categoryId) ?? null : null,
+      threads: c.threads.map((t) => t.name),
     })),
     roles: server.roles.map((r) => ({
       name: r.name,

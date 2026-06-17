@@ -31,6 +31,7 @@ model User {
   passwordResets   PasswordResetToken[]
   mentions         Mention[]
   channelReadStates ChannelReadState[]
+  threadReadStates ThreadReadState[]
   serverSupports   ServerSupporter[]
   ownedServers     Server[]                   @relation("ServerOwner")
   serverMembers    ServerMember[]
@@ -279,10 +280,24 @@ model Thread {
   lastMessageAt DateTime @default(now())
   createdAt     DateTime @default(now())
 
-  channel  Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  messages Message[]
+  channel    Channel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  messages   Message[]
+  readStates ThreadReadState[]
 
   @@index([channelId])
+}
+
+model ThreadReadState {
+  id         String   @id @default(cuid())
+  threadId   String
+  userId     String
+  lastReadAt DateTime @default(now())
+
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
 }
 
 model ChannelCategory {

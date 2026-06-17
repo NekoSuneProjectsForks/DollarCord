@@ -32,12 +32,35 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
   const [threadSeed, setThreadSeed] = useState<Message | null>(null);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
   const [showJump, setShowJump] = useState(false);
+  const [threadUnread, setThreadUnread] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Count threads with unread activity (for the header 🧵 badge).
+  const refreshThreadUnread = useCallback(() => {
+    fetch(`/api/channels/${channel.id}/threads`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setThreadUnread((d?.threads ?? []).filter((t: { unread?: boolean }) => t.unread).length))
+      .catch(() => {});
+  }, [channel.id]);
 
   function openThreadFromMessage(message: Message) {
     setThreadSeed(message);
     setThreadsOpen(true);
   }
+
+  // Refresh the thread-unread count on channel change and when the panel closes
+  // (the panel marks threads read), plus react to live thread activity.
+  useEffect(() => { refreshThreadUnread(); }, [refreshThreadUnread]);
+  useEffect(() => { if (!threadsOpen) refreshThreadUnread(); }, [threadsOpen, refreshThreadUnread]);
+  useEffect(() => {
+    if (!socket) return;
+    const onThreadActivity = ({ channelId: ch, authorId }: { channelId: string; authorId: string }) => {
+      if (ch !== channel.id || authorId === currentUser.id || threadsOpen) return;
+      setThreadUnread((c) => c + 1);
+    };
+    socket.on("channel:thread:activity", onThreadActivity);
+    return () => { socket.off("channel:thread:activity", onThreadActivity); };
+  }, [socket, channel.id, currentUser.id, threadsOpen]);
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -269,6 +292,7 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleThreads={() => { setThreadSeed(null); setThreadsOpen((o) => !o); }}
+        threadUnread={threadUnread}
       />
 
       <div

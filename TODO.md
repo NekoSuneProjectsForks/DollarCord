@@ -106,8 +106,9 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] Thread messages reuse `Message` via `threadId`
 - [x] Create thread from a message (🧵 action) or channel (header); thread list panel
 - [x] Real-time thread messages over Socket.IO (`thread:*` rooms)
-- [ ] Per-thread unread badges (channel-level unread shipped; thread-level pending) 🟡
-- [ ] Import threads from Discord templates/exports (ties into §2.4) 🟡
+- [x] Per-thread unread badges (ThreadReadState; dots in panel + count on header 🧵)
+- [x] Import threads from templates — native template export/apply now includes threads
+      (Discord guild templates don't carry threads, so this covers the native format)
 
 ---
 
