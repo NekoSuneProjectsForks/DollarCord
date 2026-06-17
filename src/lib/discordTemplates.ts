@@ -7,6 +7,14 @@ export interface DiscordTemplateChannel {
   position?: number;
 }
 
+export interface DiscordTemplateRole {
+  id?: number;
+  name?: string;
+  color?: number;
+  position?: number;
+  hoist?: boolean;
+}
+
 export interface DiscordTemplate {
   code: string;
   name?: string;
@@ -14,7 +22,14 @@ export interface DiscordTemplate {
     name?: string;
     description?: string | null;
     channels?: DiscordTemplateChannel[];
+    roles?: DiscordTemplateRole[];
   };
+}
+
+/** Convert a Discord integer color (0 = no color) to a hex string. */
+export function discordColorToHex(color: number | undefined): string {
+  if (!color || color <= 0) return "#7c6af7";
+  return `#${color.toString(16).padStart(6, "0")}`;
 }
 
 export function extractDiscordTemplateCode(input: string) {

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { Avatar } from "@/components/ui/Avatar";
-import { formatDate } from "@/lib/dateTime";
+import { AccountSettings } from "./AccountSettings";
+import { ActivitySettings } from "./ActivitySettings";
 import type { User } from "@/types";
 
 interface Props { user: User }
@@ -22,7 +23,7 @@ export function UserSettingsPage({ user }: Props) {
     kickChannel: user.kickChannel ?? "",
   });
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"profile" | "account">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "account" | "activity">("profile");
 
   function update(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -62,7 +63,7 @@ export function UserSettingsPage({ user }: Props) {
     <div className="flex flex-1 overflow-hidden bg-dc-chat">
       <div className="w-56 bg-dc-sidebar border-r border-dc-border p-4 shrink-0">
         <p className="text-dc-muted text-xs font-semibold uppercase tracking-wide mb-2 px-2">User Settings</p>
-        {(["profile", "account"] as const).map((tab) => (
+        {(["profile", "account", "activity"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -189,25 +190,7 @@ export function UserSettingsPage({ user }: Props) {
 
           {activeTab === "account" && (
             <>
-              <h2 className="text-dc-text text-xl font-bold mb-6">Account</h2>
-              <div className="bg-dc-sidebar rounded-lg p-4 space-y-3">
-                <div>
-                  <p className="text-dc-muted text-xs uppercase tracking-wide font-semibold mb-1">Email</p>
-                  <p className="text-dc-text text-sm">{user.email}</p>
-                </div>
-                <div>
-                  <p className="text-dc-muted text-xs uppercase tracking-wide font-semibold mb-1">Username</p>
-                  <p className="text-dc-text text-sm">@{user.username}</p>
-                </div>
-                <div>
-                  <p className="text-dc-muted text-xs uppercase tracking-wide font-semibold mb-1">Member Since</p>
-                  <p className="text-dc-text text-sm">{formatDate(user.createdAt)}</p>
-                </div>
-                <div>
-                  <p className="text-dc-muted text-xs uppercase tracking-wide font-semibold mb-1">Platform Role</p>
-                  <p className="text-dc-text text-sm">{user.isPlatformAdmin ? "DollarCord Admin" : "User"}</p>
-                </div>
-              </div>
+              <AccountSettings user={user} />
               <div className="mt-6 p-4 bg-dc-danger/10 rounded-lg border border-dc-danger/20">
                 <h3 className="text-dc-danger font-semibold mb-1">Danger Zone</h3>
                 <p className="text-dc-muted text-sm mb-3">Once you log out, you&apos;ll need to sign in again.</p>
@@ -220,6 +203,8 @@ export function UserSettingsPage({ user }: Props) {
               </div>
             </>
           )}
+
+          {activeTab === "activity" && <ActivitySettings user={user} />}
         </div>
       </div>
     </div>

@@ -68,6 +68,7 @@ export const createChannelSchema = z.object({
     .max(100)
     .regex(/^[a-z0-9-]+$/, "Channel name can only contain lowercase letters, numbers, and hyphens"),
   description: z.string().max(256).nullable().optional(),
+  type: z.enum(["TEXT", "VOICE"]).default("TEXT").optional(),
 });
 
 export const updateChannelSchema = z.object({
@@ -163,4 +164,78 @@ export const updateServerEventParticipantSchema = z.object({
 export const importDiscordTemplateSchema = z.object({
   template: z.string().trim().min(1, "Discord template link or code is required").max(300),
   importServerName: z.boolean().default(false).optional(),
+  importRoles: z.boolean().default(true).optional(),
+  importVoiceChannels: z.boolean().default(true).optional(),
+});
+
+// ---- Account management -----------------------------------------------------
+
+export const changeUsernameSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .min(2, "Username must be at least 2 characters")
+    .max(32, "Username must be at most 32 characters")
+    .regex(/^[a-zA-Z0-9_.-]+$/, "Username can only contain letters, numbers, underscores, dots, and hyphens"),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long"),
+});
+
+export const requestPasswordResetSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const confirmPasswordResetSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long"),
+});
+
+// ---- Presence / activity ----------------------------------------------------
+
+export const updateStatusSchema = z.object({
+  status: z.enum(["ONLINE", "IDLE", "DND", "INVISIBLE"]).optional(),
+  customStatus: z.string().trim().max(128, "Custom status must be at most 128 characters").nullable().optional(),
+  customStatusEmoji: z.string().trim().max(16).nullable().optional(),
+});
+
+export const setActivitySchema = z.object({
+  type: z.enum(["PLAYING", "STREAMING", "LISTENING", "WATCHING", "COMPETING", "CUSTOM"]).default("PLAYING"),
+  name: z.string().trim().min(1, "Activity name is required").max(128),
+  details: z.string().trim().max(128).nullable().optional(),
+  state: z.string().trim().max(128).nullable().optional(),
+  url: z.string().url("Invalid URL").nullable().optional(),
+  largeImage: z.string().trim().max(512).nullable().optional(),
+  smallImage: z.string().trim().max(512).nullable().optional(),
+  startedAt: z.string().datetime().nullable().optional(),
+});
+
+// Discord-RPC-compatible ingest payload (SetActivity-shaped). We accept the
+// loose shape Discord game SDKs send and normalize it server-side.
+export const rpcActivitySchema = z.object({
+  // Either authenticate with a per-user RPC token in the body or via header.
+  token: z.string().min(1).optional(),
+  // `null` activity clears presence (Discord's ClearActivity).
+  activity: z
+    .object({
+      type: z.number().int().min(0).max(6).optional(), // Discord activity type enum
+      name: z.string().max(128).optional(),
+      details: z.string().max(128).nullable().optional(),
+      state: z.string().max(128).nullable().optional(),
+      url: z.string().max(512).nullable().optional(),
+      timestamps: z
+        .object({ start: z.union([z.number(), z.string()]).nullable().optional() })
+        .nullable()
+        .optional(),
+      assets: z
+        .object({
+          large_image: z.string().max(512).nullable().optional(),
+          small_image: z.string().max(512).nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+    })
+    .nullable(),
 });

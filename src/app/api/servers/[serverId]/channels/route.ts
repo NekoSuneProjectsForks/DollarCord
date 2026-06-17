@@ -46,6 +46,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         serverId: params.serverId,
         name: parsed.data.name,
         description: parsed.data.description ?? null,
+        type: parsed.data.type ?? "TEXT",
         position: count,
       },
     });

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserFromReq } from "@/lib/auth";
-import { extractDiscordTemplateCode, fetchDiscordTemplate, normalizeChannelName } from "@/lib/discordTemplates";
+import {
+  discordColorToHex,
+  extractDiscordTemplateCode,
+  fetchDiscordTemplate,
+  normalizeChannelName,
+} from "@/lib/discordTemplates";
 import { prisma } from "@/lib/prisma";
 import { getServerMember, isServerManager } from "@/lib/serverApi";
 import { importDiscordTemplateSchema } from "@/lib/validations";
@@ -8,7 +13,8 @@ import { getIO } from "@/server/socketServer";
 
 interface Params { params: { serverId: string } }
 
-const TEXT_CHANNEL_TYPES = new Set([0, 5]);
+const TEXT_CHANNEL_TYPES = new Set([0, 5]); // text, announcement
+const VOICE_CHANNEL_TYPES = new Set([2, 13]); // voice, stage
 
 export async function POST(req: NextRequest, { params }: Params) {
   const user = await getCurrentUserFromReq(req);
@@ -38,20 +44,23 @@ export async function POST(req: NextRequest, { params }: Params) {
   const existingNames = new Set(existingChannels.map((channel) => channel.name));
   let nextPosition = existingChannels.length;
 
+  const importVoice = parsed.data.importVoiceChannels ?? true;
+  const importRoles = parsed.data.importRoles ?? true;
+
   const sourceChannels = template.serialized_source_guild.channels ?? [];
   const channelInputs = sourceChannels
-    .filter((channel) => TEXT_CHANNEL_TYPES.has(channel.type ?? -1))
+    .filter((channel) =>
+      TEXT_CHANNEL_TYPES.has(channel.type ?? -1) ||
+      (importVoice && VOICE_CHANNEL_TYPES.has(channel.type ?? -1))
+    )
     .sort((left, right) => (left.position ?? 0) - (right.position ?? 0))
     .map((channel) => ({
       name: normalizeChannelName(channel.name ?? ""),
       description: channel.topic?.slice(0, 256) ?? null,
+      type: VOICE_CHANNEL_TYPES.has(channel.type ?? -1) ? "VOICE" : "TEXT",
     }))
     .filter((channel) => channel.name && !existingNames.has(channel.name))
-    .slice(0, 50);
-
-  if (channelInputs.length === 0) {
-    return NextResponse.json({ error: "No new text channels found in that template" }, { status: 400 });
-  }
+    .slice(0, 100);
 
   const createdChannels = [];
   for (const channel of channelInputs) {
@@ -61,10 +70,45 @@ export async function POST(req: NextRequest, { params }: Params) {
         serverId: params.serverId,
         name: channel.name,
         description: channel.description,
+        type: channel.type,
         position: nextPosition++,
       },
     });
     createdChannels.push(created);
+  }
+
+  // Roles (skip @everyone and any names that already exist).
+  const createdRoles = [];
+  if (importRoles) {
+    const existingRoles = await prisma.serverRole.findMany({
+      where: { serverId: params.serverId },
+      select: { name: true, position: true },
+    });
+    const existingRoleNames = new Set(existingRoles.map((r) => r.name));
+    let rolePos = existingRoles.length;
+
+    const sourceRoles = (template.serialized_source_guild.roles ?? [])
+      .filter((r) => r.name && r.name !== "@everyone" && !existingRoleNames.has(r.name.slice(0, 32)))
+      .sort((a, b) => (b.position ?? 0) - (a.position ?? 0))
+      .slice(0, 25);
+
+    for (const role of sourceRoles) {
+      const name = role.name!.slice(0, 32);
+      existingRoleNames.add(name);
+      try {
+        const created = await prisma.serverRole.create({
+          data: {
+            serverId: params.serverId,
+            name,
+            color: discordColorToHex(role.color),
+            position: rolePos++,
+          },
+        });
+        createdRoles.push(created);
+      } catch {
+        // Unique-constraint race or invalid name — skip this role.
+      }
+    }
   }
 
   if (parsed.data.importServerName && template.serialized_source_guild.name) {
@@ -77,6 +121,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
   }
 
+  if (createdChannels.length === 0 && createdRoles.length === 0 && !parsed.data.importServerName) {
+    return NextResponse.json({ error: "Nothing new to import from that template" }, { status: 400 });
+  }
+
   try {
     const io = getIO();
     for (const channel of createdChannels) {
@@ -84,5 +132,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   } catch {}
 
-  return NextResponse.json({ templateName: template.name, channels: createdChannels }, { status: 201 });
+  return NextResponse.json(
+    { templateName: template.name, channels: createdChannels, roles: createdRoles },
+    { status: 201 }
+  );
 }

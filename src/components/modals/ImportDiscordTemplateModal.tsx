@@ -16,6 +16,8 @@ export function ImportDiscordTemplateModal({ open, onClose, serverId, onImported
   const { addToast } = useToast();
   const [template, setTemplate] = useState("");
   const [importServerName, setImportServerName] = useState(false);
+  const [importVoiceChannels, setImportVoiceChannels] = useState(true);
+  const [importRoles, setImportRoles] = useState(true);
   const [importing, setImporting] = useState(false);
 
   async function handleImport(e: React.FormEvent) {
@@ -26,7 +28,7 @@ export function ImportDiscordTemplateModal({ open, onClose, serverId, onImported
       const res = await fetch(`/api/servers/${serverId}/templates/import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template, importServerName }),
+        body: JSON.stringify({ template, importServerName, importVoiceChannels, importRoles }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -34,7 +36,14 @@ export function ImportDiscordTemplateModal({ open, onClose, serverId, onImported
         return;
       }
       onImported(data.channels ?? []);
-      addToast(`Imported ${(data.channels ?? []).length} channel${(data.channels ?? []).length === 1 ? "" : "s"}.`, "success");
+      const channelCount = (data.channels ?? []).length;
+      const roleCount = (data.roles ?? []).length;
+      addToast(
+        `Imported ${channelCount} channel${channelCount === 1 ? "" : "s"}` +
+          (roleCount ? ` and ${roleCount} role${roleCount === 1 ? "" : "s"}` : "") +
+          ".",
+        "success"
+      );
       setTemplate("");
       setImportServerName(false);
       onClose();
@@ -57,17 +66,38 @@ export function ImportDiscordTemplateModal({ open, onClose, serverId, onImported
             placeholder="https://discord.new/example"
           />
         </div>
-        <label className="flex items-center gap-2 text-sm text-dc-muted">
-          <input
-            type="checkbox"
-            checked={importServerName}
-            onChange={(e) => setImportServerName(e.target.checked)}
-            className="accent-dc-accent"
-          />
-          Update this server name from the template
-        </label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm text-dc-muted">
+            <input
+              type="checkbox"
+              checked={importServerName}
+              onChange={(e) => setImportServerName(e.target.checked)}
+              className="accent-dc-accent"
+            />
+            Update this server name & description from the template
+          </label>
+          <label className="flex items-center gap-2 text-sm text-dc-muted">
+            <input
+              type="checkbox"
+              checked={importVoiceChannels}
+              onChange={(e) => setImportVoiceChannels(e.target.checked)}
+              className="accent-dc-accent"
+            />
+            Import voice & stage channels
+          </label>
+          <label className="flex items-center gap-2 text-sm text-dc-muted">
+            <input
+              type="checkbox"
+              checked={importRoles}
+              onChange={(e) => setImportRoles(e.target.checked)}
+              className="accent-dc-accent"
+            />
+            Import roles (name & color)
+          </label>
+        </div>
         <div className="rounded border border-dc-border bg-dc-chat p-3 text-xs text-dc-muted">
-          Public Discord templates expose channel layout. DollarCord imports text and announcement channels as text channels.
+          Public Discord templates expose channel layout, voice channels, and roles. Text & announcement channels
+          become text channels; voice & stage channels become voice channels.
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-dc-muted hover:text-dc-text">

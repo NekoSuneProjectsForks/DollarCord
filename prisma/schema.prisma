@@ -18,10 +18,17 @@ model User {
   avatarUrl       String?
   twitchChannel   String?
   kickChannel     String?
+  status            String    @default("ONLINE") // ONLINE | IDLE | DND | INVISIBLE
+  customStatus      String?
+  customStatusEmoji String?
+  usernameChangedAt DateTime?
+  rpcToken          String?   @unique
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   sessions         Session[]
+  activities       Activity[]
+  passwordResets   PasswordResetToken[]
   ownedServers     Server[]                   @relation("ServerOwner")
   serverMembers    ServerMember[]
   messages         Message[]
@@ -188,6 +195,7 @@ model Channel {
   serverId    String
   name        String
   description String?
+  type        String   @default("TEXT") // TEXT | VOICE
   position    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -311,4 +319,42 @@ model DirectMessage {
 
   thread DirectMessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
   sender User                @relation("DMSender", fields: [senderId], references: [id])
+}
+
+// Rich-presence activity. One row per (user, source) so an RPC client, a manual
+// status, and a Twitch poller can each own an independent activity that we merge
+// for display. `source` = "manual" | "rpc" | "twitch".
+model Activity {
+  id         String    @id @default(cuid())
+  userId     String
+  source     String    @default("manual")
+  type       String    @default("PLAYING") // PLAYING | STREAMING | LISTENING | WATCHING | COMPETING | CUSTOM
+  name       String
+  details    String?
+  state      String?
+  url        String?
+  largeImage String?
+  smallImage String?
+  startedAt  DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, source])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -4,7 +4,26 @@ interface AvatarProps {
   user: Pick<User, "displayName" | "username" | "avatarUrl">;
   size?: "xs" | "sm" | "md" | "lg";
   online?: boolean;
+  /** When provided, the presence dot reflects ONLINE/IDLE/DND/etc. */
+  status?: string;
   className?: string;
+}
+
+function statusDotClass(status: string | undefined, online: boolean | undefined): string {
+  // Offline / invisible always read as gray, regardless of status value.
+  if (online === false) return "bg-dc-faint";
+  switch (status) {
+    case "IDLE":
+      return "bg-dc-warning";
+    case "DND":
+      return "bg-dc-danger";
+    case "INVISIBLE":
+    case "OFFLINE":
+      return "bg-dc-faint";
+    case "ONLINE":
+    default:
+      return online === undefined ? "bg-dc-faint" : "bg-dc-success";
+  }
 }
 
 const sizes = {
@@ -32,7 +51,7 @@ function hashColor(str: string): string {
   return colors[hash % colors.length];
 }
 
-export function Avatar({ user, size = "md", online, className = "" }: AvatarProps) {
+export function Avatar({ user, size = "md", online, status, className = "" }: AvatarProps) {
   const initial = (user.displayName || user.username || "?")[0].toUpperCase();
   const colorClass = hashColor(user.username || user.displayName || "x");
 
@@ -51,11 +70,12 @@ export function Avatar({ user, size = "md", online, className = "" }: AvatarProp
           {initial}
         </div>
       )}
-      {online !== undefined && (
+      {(online !== undefined || status !== undefined) && (
         <span
-          className={`absolute ${indicatorSizes[size]} rounded-full border-2 border-dc-sidebar ${
-            online ? "bg-dc-success" : "bg-dc-faint"
-          }`}
+          className={`absolute ${indicatorSizes[size]} rounded-full border-2 border-dc-sidebar ${statusDotClass(
+            status,
+            online
+          )}`}
         />
       )}
     </div>

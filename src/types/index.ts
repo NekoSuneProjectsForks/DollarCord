@@ -1,3 +1,5 @@
+export type UserStatus = "ONLINE" | "IDLE" | "DND" | "INVISIBLE" | "OFFLINE";
+
 export interface User {
   id: string;
   email: string;
@@ -8,6 +10,10 @@ export interface User {
   avatarUrl: string | null;
   twitchChannel?: string | null;
   kickChannel?: string | null;
+  status?: string;
+  customStatus?: string | null;
+  customStatusEmoji?: string | null;
+  usernameChangedAt?: Date | string | null;
   createdAt: Date | string;
   updatedAt?: Date | string;
 }
@@ -107,11 +113,14 @@ export interface Invite {
   createdAt: Date | string;
 }
 
+export type ChannelType = "TEXT" | "VOICE";
+
 export interface Channel {
   id: string;
   serverId: string;
   name: string;
   description: string | null;
+  type?: string;
   position: number;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -202,6 +211,42 @@ export interface TypingUser {
 }
 
 export type PresenceMap = Record<string, boolean>;
+
+export type ActivityType = "PLAYING" | "STREAMING" | "LISTENING" | "WATCHING" | "COMPETING" | "CUSTOM";
+
+export interface Activity {
+  id: string;
+  source: string; // "manual" | "rpc" | "twitch"
+  type: ActivityType;
+  name: string;
+  details: string | null;
+  state: string | null;
+  url: string | null;
+  largeImage: string | null;
+  smallImage: string | null;
+  startedAt: string | null;
+}
+
+export interface UserPresence {
+  status: UserStatus;
+  customStatus: string | null;
+  customStatusEmoji: string | null;
+}
+
+export type StatusMap = Record<string, UserPresence>;
+export type ActivityMap = Record<string, Activity[]>;
+
+export interface VoiceParticipant {
+  socketId: string;
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  muted: boolean;
+  deafened: boolean;
+}
+
+export type VoiceRoomMap = Record<string, VoiceParticipant[]>;
 
 export type MemberRole = "OWNER" | "ADMIN" | "MEMBER";
 

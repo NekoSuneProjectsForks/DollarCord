@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Modal } from "@/components/ui/Modal";
 import { formatShortDate } from "@/lib/dateTime";
-import type { LiveStreamStatus, ServerMember, User } from "@/types";
+import { useSocket } from "@/contexts/SocketContext";
+import type { Activity, LiveStreamStatus, ServerMember, User } from "@/types";
+
+const ACTIVITY_VERB: Record<string, string> = {
+  PLAYING: "Playing",
+  STREAMING: "Streaming",
+  LISTENING: "Listening to",
+  WATCHING: "Watching",
+  COMPETING: "Competing in",
+  CUSTOM: "",
+};
 
 interface Props {
   open: boolean;
@@ -27,12 +37,15 @@ function providerLabel(provider: LiveStreamStatus["provider"]) {
 }
 
 export function UserProfileModal({ open, onClose, userId, serverId }: Props) {
+  const { activities: liveActivities } = useSocket();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fetchedActivities, setFetchedActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     if (!open || !userId) {
       setProfile(null);
+      setFetchedActivities([]);
       return;
     }
 
@@ -46,12 +59,19 @@ export function UserProfileModal({ open, onClose, userId, serverId }: Props) {
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
 
+    fetch(`/api/presence?userIds=${userId}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setFetchedActivities(data?.activities?.[userId] ?? []))
+      .catch(() => {});
+
     return () => controller.abort();
   }, [open, userId, serverId]);
 
   const user = profile?.user;
   const roles = profile?.member?.roles ?? [];
   const streams = profile?.streams ?? [];
+  // Prefer live socket activities when available, fall back to the initial fetch.
+  const activities = (userId && liveActivities[userId]) || fetchedActivities;
 
   return (
     <Modal open={open} onClose={onClose} title="Profile">
@@ -78,6 +98,31 @@ export function UserProfileModal({ open, onClose, userId, serverId }: Props) {
           </div>
 
           {user.bio && <p className="text-sm text-dc-muted whitespace-pre-wrap">{user.bio}</p>}
+
+          {activities.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-dc-muted">Activity</p>
+              {activities.map((a) => (
+                <div key={a.id} className="flex items-start gap-3 rounded border border-dc-border bg-dc-chat p-3">
+                  {a.largeImage && (
+                    <img src={a.largeImage} alt="" className="h-12 w-12 rounded object-cover shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dc-text">
+                      {a.type === "CUSTOM" ? a.name : `${ACTIVITY_VERB[a.type] ?? "Playing"} ${a.name}`}
+                    </p>
+                    {a.details && <p className="text-xs text-dc-muted truncate">{a.details}</p>}
+                    {a.state && <p className="text-xs text-dc-faint truncate">{a.state}</p>}
+                    {a.url && a.type === "STREAMING" && (
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-xs text-dc-accent hover:underline">
+                        Watch stream
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {roles.length > 0 && (
             <div>

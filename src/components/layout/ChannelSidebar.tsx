@@ -7,6 +7,7 @@ import { useSocket } from "@/contexts/SocketContext";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserBar } from "./UserBar";
+import { Avatar } from "@/components/ui/Avatar";
 import { CreateChannelModal } from "@/components/modals/CreateChannelModal";
 import { CreateEventModal } from "@/components/modals/CreateEventModal";
 import { EventDetailsModal } from "@/components/modals/EventDetailsModal";
@@ -29,7 +30,7 @@ interface Props {
 export function ChannelSidebar({ server, channels: initialChannels, initialEvents = [], currentUserId, currentUserRole }: Props) {
   const pathname = usePathname();
   const router = useRouter();
-  const { socket } = useSocket();
+  const { socket, voiceRooms } = useSocket();
   const { addToast } = useToast();
   const { user, logout } = useAuth();
   const [channels, setChannels] = useState<Channel[]>(initialChannels);
@@ -157,6 +158,80 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
     }
     setEvents((prev) => prev.map((event) => (event.id === nextEvent.id ? nextEvent : event)));
     setSelectedEvent(nextEvent);
+  }
+
+  const textChannels = channels.filter((c) => (c.type ?? "TEXT") !== "VOICE");
+  const voiceChannels = channels.filter((c) => c.type === "VOICE");
+
+  function renderChannelRow(channel: Channel) {
+    const isActive = activeChannelId === channel.id;
+    const isEditing = editingChannel === channel.id;
+    const isVoice = channel.type === "VOICE";
+    const vp = isVoice ? voiceRooms[channel.id] ?? [] : [];
+
+    return (
+      <div key={channel.id}>
+        <div
+          className={`group flex items-center mx-2 rounded px-2 h-8 cursor-pointer transition-colors ${
+            isActive ? "bg-dc-active text-dc-text" : "text-dc-muted hover:text-dc-text hover:bg-dc-hover"
+          }`}
+        >
+          {isEditing ? (
+            <input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={() => { setEditingChannel(null); setEditName(""); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameChannel(channel.id);
+                if (e.key === "Escape") { setEditingChannel(null); setEditName(""); }
+              }}
+              className="flex-1 bg-dc-input text-dc-text text-sm px-2 py-0.5 rounded border border-dc-accent focus:outline-none"
+            />
+          ) : (
+            <Link href={`/servers/${server.id}/${channel.id}`} className="flex items-center gap-1.5 flex-1 min-w-0">
+              <span className="text-dc-muted text-base leading-none">{isVoice ? "🔊" : "#"}</span>
+              <span className="text-sm truncate">{channel.name}</span>
+              {isVoice && vp.length > 0 && (
+                <span className="ml-auto text-[10px] text-dc-faint">{vp.length}</span>
+              )}
+            </Link>
+          )}
+
+          {canManage && !isEditing && (
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+              <button
+                onClick={() => { setEditingChannel(channel.id); setEditName(channel.name); }}
+                className="w-5 h-5 flex items-center justify-center text-dc-muted hover:text-dc-text rounded text-xs"
+                title="Rename"
+              >
+                ✏
+              </button>
+              <button
+                onClick={() => handleDeleteChannel(channel.id)}
+                className="w-5 h-5 flex items-center justify-center text-dc-muted hover:text-dc-danger rounded text-xs"
+                title="Delete"
+              >
+                🗑
+              </button>
+            </div>
+          )}
+        </div>
+
+        {isVoice && vp.length > 0 && (
+          <div className="ml-7 mr-2 mt-0.5 mb-1 space-y-0.5">
+            {vp.map((p) => (
+              <div key={p.socketId} className="flex items-center gap-2 px-1 py-0.5 text-dc-muted">
+                <Avatar user={p} size="xs" />
+                <span className="text-xs truncate flex-1">{p.displayName}</span>
+                {p.muted && <span className="text-[10px] text-dc-danger" title="Muted">🔇</span>}
+                {p.deafened && <span className="text-[10px] text-dc-danger" title="Deafened">🔈</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -299,64 +374,30 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
             )}
           </div>
 
-          {channels.map((channel) => {
-            const isActive = activeChannelId === channel.id;
-            const isEditing = editingChannel === channel.id;
+          {textChannels.map(renderChannelRow)}
 
-            return (
-              <div
-                key={channel.id}
-                className={`group flex items-center mx-2 rounded px-2 h-8 cursor-pointer transition-colors ${
-                  isActive ? "bg-dc-active text-dc-text" : "text-dc-muted hover:text-dc-text hover:bg-dc-hover"
-                }`}
-              >
-                {isEditing ? (
-                  <input
-                    autoFocus
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onBlur={() => { setEditingChannel(null); setEditName(""); }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRenameChannel(channel.id);
-                      if (e.key === "Escape") { setEditingChannel(null); setEditName(""); }
-                    }}
-                    className="flex-1 bg-dc-input text-dc-text text-sm px-2 py-0.5 rounded border border-dc-accent focus:outline-none"
-                  />
-                ) : (
-                  <Link
-                    href={`/servers/${server.id}/${channel.id}`}
-                    className="flex items-center gap-1.5 flex-1 min-w-0"
-                  >
-                    <span className="text-dc-muted text-base leading-none">#</span>
-                    <span className="text-sm truncate">{channel.name}</span>
-                  </Link>
-                )}
-
-                {canManage && !isEditing && (
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
-                    <button
-                      onClick={() => { setEditingChannel(channel.id); setEditName(channel.name); }}
-                      className="w-5 h-5 flex items-center justify-center text-dc-muted hover:text-dc-text rounded text-xs"
-                      title="Rename"
-                    >
-                      ✏
-                    </button>
-                    <button
-                      onClick={() => handleDeleteChannel(channel.id)}
-                      className="w-5 h-5 flex items-center justify-center text-dc-muted hover:text-dc-danger rounded text-xs"
-                      title="Delete"
-                    >
-                      🗑
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {channels.length === 0 && (
-            <p className="text-dc-muted text-xs px-4 py-2">No channels yet</p>
+          {textChannels.length === 0 && (
+            <p className="text-dc-muted text-xs px-4 py-2">No text channels yet</p>
           )}
+
+          {(voiceChannels.length > 0 || canManage) && (
+            <div className="px-2 mt-4 mb-1 flex items-center justify-between group">
+              <span className="text-xs font-semibold text-dc-muted uppercase tracking-wide px-2">
+                Voice Channels
+              </span>
+              {canManage && (
+                <button
+                  onClick={() => setShowCreate(true)}
+                  className="text-dc-muted hover:text-dc-text transition-colors opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center font-bold text-base"
+                  title="Create Channel"
+                >
+                  +
+                </button>
+              )}
+            </div>
+          )}
+
+          {voiceChannels.map(renderChannelRow)}
         </div>
 
         {/* User bar */}

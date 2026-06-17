@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ChatArea } from "@/components/chat/ChatArea";
+import { VoiceChannelView } from "@/components/voice/VoiceChannelView";
 
 interface Props {
   params: { serverId: string; channelId: string };
@@ -23,6 +24,10 @@ export default async function ChannelPage({ params }: Props) {
     where: { serverId_userId: { serverId: params.serverId, userId: user.id } },
   });
   if (!member) notFound();
+
+  if (channel.type === "VOICE") {
+    return <VoiceChannelView channel={channel as any} currentUser={user} />;
+  }
 
   const initialMessages = await prisma.message.findMany({
     where: { channelId: params.channelId, deleted: false },

@@ -32,16 +32,40 @@ function groupByRole(members: ServerMember[]) {
   return groups;
 }
 
+const ACTIVITY_VERB: Record<string, string> = {
+  PLAYING: "Playing",
+  STREAMING: "Streaming",
+  LISTENING: "Listening to",
+  WATCHING: "Watching",
+  COMPETING: "Competing in",
+  CUSTOM: "",
+};
+
 export function MemberSidebar({ members, serverId, currentUserId, currentUserRole }: Props) {
-  const { presence, socket } = useSocket();
+  const { presence, socket, statuses, activities } = useSocket();
   const { addToast } = useToast();
   const [search, setSearch] = useState("");
   const [memberList, setMemberList] = useState(sortMembers(members));
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [seed, setSeed] = useState<{ statuses: typeof statuses; activities: typeof activities }>({
+    statuses: {},
+    activities: {},
+  });
 
   useEffect(() => {
     setMemberList(sortMembers(members));
+  }, [members]);
+
+  // Seed statuses/activities once for the current member set; live socket
+  // events take precedence afterwards.
+  useEffect(() => {
+    const ids = members.map((m) => m.userId).join(",");
+    if (!ids) return;
+    fetch(`/api/presence?userIds=${ids}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setSeed({ statuses: data.statuses ?? {}, activities: data.activities ?? {} }))
+      .catch(() => {});
   }, [members]);
 
   useEffect(() => {
@@ -156,6 +180,14 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
               </p>
               {group.map((member) => {
                 const online = presence[member.userId] ?? false;
+                const memberStatus = statuses[member.userId]?.status ?? seed.statuses[member.userId]?.status;
+                const customStatus = statuses[member.userId]?.customStatus ?? seed.statuses[member.userId]?.customStatus;
+                const memberActivity = (activities[member.userId] ?? seed.activities[member.userId])?.[0];
+                const subtitle = memberActivity
+                  ? memberActivity.type === "CUSTOM"
+                    ? memberActivity.name
+                    : `${ACTIVITY_VERB[memberActivity.type] ?? "Playing"} ${memberActivity.name}`
+                  : customStatus || null;
                 const isSelf = member.userId === currentUserId;
                 const canPromote = !isSelf && canChangeRole(currentUserRole, member.role) && member.role === "MEMBER";
                 const canDemote = !isSelf && canChangeRole(currentUserRole, member.role) && member.role === "ADMIN";
@@ -168,19 +200,23 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                     onClick={() => setSelectedUserId(member.userId)}
                     className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-dc-hover transition-colors group cursor-pointer"
                   >
-                    <Avatar user={member.user} size="sm" online={online} />
+                    <Avatar user={member.user} size="sm" online={online} status={online ? memberStatus : "OFFLINE"} />
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-medium truncate ${online ? "text-dc-text" : "text-dc-muted"}`}>
                         {member.user.displayName}
                       </p>
-                      <div className="flex items-center gap-1 min-w-0">
-                        <p className="text-xs text-dc-faint truncate">@{member.user.username}</p>
-                        {(member.user.twitchChannel || member.user.kickChannel) && (
-                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-dc-accent">
-                            Stream
-                          </span>
-                        )}
-                      </div>
+                      {subtitle ? (
+                        <p className="text-xs text-dc-faint truncate" title={subtitle}>{subtitle}</p>
+                      ) : (
+                        <div className="flex items-center gap-1 min-w-0">
+                          <p className="text-xs text-dc-faint truncate">@{member.user.username}</p>
+                          {(member.user.twitchChannel || member.user.kickChannel) && (
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-dc-accent">
+                              Stream
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {member.roles && member.roles.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {member.roles.slice(0, 2).map(({ role }) => (
