@@ -26,6 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const where: Record<string, unknown> = {
     channelId: params.channelId,
     deleted: false,
+    threadId: null, // thread replies live in their own view
     ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {}),
     ...(search ? { content: { contains: search } } : {}),
   };

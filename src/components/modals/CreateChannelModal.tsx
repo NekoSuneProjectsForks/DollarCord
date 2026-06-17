@@ -17,6 +17,7 @@ export function CreateChannelModal({ open, onClose, serverId, onCreated }: Props
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<"TEXT" | "VOICE">("TEXT");
+  const [nsfw, setNsfw] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -29,7 +30,7 @@ export function CreateChannelModal({ open, onClose, serverId, onCreated }: Props
       const res = await fetch(`/api/servers/${serverId}/channels`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: slug, description: description.trim() || null, type }),
+        body: JSON.stringify({ name: slug, description: description.trim() || null, type, nsfw }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -41,6 +42,7 @@ export function CreateChannelModal({ open, onClose, serverId, onCreated }: Props
       setName("");
       setDescription("");
       setType("TEXT");
+      setNsfw(false);
       onClose();
     } finally {
       setLoading(false);
@@ -106,6 +108,10 @@ export function CreateChannelModal({ open, onClose, serverId, onCreated }: Props
             placeholder="What's this channel about?"
           />
         </div>
+        <label className="flex items-center gap-2 text-sm text-dc-muted">
+          <input type="checkbox" checked={nsfw} onChange={(e) => setNsfw(e.target.checked)} className="accent-dc-accent" />
+          Age-restricted (NSFW) — members must confirm before viewing
+        </label>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-dc-muted hover:text-dc-text transition-colors">
             Cancel

@@ -47,6 +47,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         name: parsed.data.name,
         description: parsed.data.description ?? null,
         type: parsed.data.type ?? "TEXT",
+        nsfw: parsed.data.nsfw ?? false,
         position: count,
       },
     });

@@ -31,6 +31,7 @@ model User {
   passwordResets   PasswordResetToken[]
   mentions         Mention[]
   channelReadStates ChannelReadState[]
+  serverSupports   ServerSupporter[]
   ownedServers     Server[]                   @relation("ServerOwner")
   serverMembers    ServerMember[]
   messages         Message[]
@@ -77,6 +78,23 @@ model Server {
   userSettings ServerUserSettings[]
   events       ServerEvent[]
   categories   ChannelCategory[]
+  supporters   ServerSupporter[]
+}
+
+// "Server Supporters" — DollarCord's community-support/tier system (a boosting
+// analogue, deliberately NOT a paid "Nitro"). Members can support a server to
+// raise its tier and unlock cosmetic perks.
+model ServerSupporter {
+  id        String   @id @default(cuid())
+  serverId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId])
+  @@index([serverId])
 }
 
 model ServerUserSettings {
@@ -202,6 +220,7 @@ model Channel {
   description     String?
   type            String   @default("TEXT") // TEXT | VOICE | ANNOUNCEMENT | FORUM
   slowmodeSeconds Int      @default(0)
+  nsfw            Boolean  @default(false)
   position        Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -212,6 +231,23 @@ model Channel {
   pinnedMessages PinnedMessage[]
   events         ServerEvent[]
   readStates     ChannelReadState[]
+  threads        Thread[]
+}
+
+model Thread {
+  id            String   @id @default(cuid())
+  channelId     String
+  rootMessageId String?
+  name          String
+  createdBy     String
+  archived      Boolean  @default(false)
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  channel  Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([channelId])
 }
 
 model ChannelCategory {
@@ -274,6 +310,7 @@ model ServerEventParticipant {
 model Message {
   id               String   @id @default(cuid())
   channelId        String
+  threadId         String?
   userId           String?
   botId            String?
   content          String
@@ -285,6 +322,7 @@ model Message {
   updatedAt        DateTime @updatedAt
 
   channel     Channel         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  thread      Thread?         @relation(fields: [threadId], references: [id], onDelete: Cascade)
   user        User?           @relation(fields: [userId], references: [id])
   bot         Bot?            @relation(fields: [botId], references: [id])
   replyTo     Message?        @relation("MessageReply", fields: [replyToId], references: [id])
@@ -293,6 +331,8 @@ model Message {
   pinnedIn    PinnedMessage[]
   attachments Attachment[]
   mentions    Mention[]
+
+  @@index([threadId])
 }
 
 model Attachment {

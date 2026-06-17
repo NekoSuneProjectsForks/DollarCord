@@ -71,6 +71,7 @@ export const createChannelSchema = z.object({
   description: z.string().max(256).nullable().optional(),
   type: z.enum(["TEXT", "VOICE", "ANNOUNCEMENT", "FORUM"]).default("TEXT").optional(),
   categoryId: z.string().nullable().optional(),
+  nsfw: z.boolean().optional(),
 });
 
 export const updateChannelSchema = z.object({
@@ -83,6 +84,7 @@ export const updateChannelSchema = z.object({
   description: z.string().max(256).nullable().optional(),
   categoryId: z.string().nullable().optional(),
   slowmodeSeconds: z.number().int().min(0).max(21600).optional(),
+  nsfw: z.boolean().optional(),
 });
 
 export const attachmentInputSchema = z.object({
@@ -104,6 +106,12 @@ export const sendMessageSchema = z
     message: "Message cannot be empty",
     path: ["content"],
   });
+
+export const createThreadSchema = z.object({
+  name: z.string().trim().min(1, "Thread name is required").max(100, "Thread name is too long"),
+  rootMessageId: z.string().nullable().optional(),
+  content: z.string().max(4000).optional(),
+});
 
 export const editMessageSchema = z.object({
   content: z

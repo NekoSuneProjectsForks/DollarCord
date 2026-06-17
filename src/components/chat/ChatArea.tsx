@@ -7,6 +7,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ChannelHeader } from "./ChannelHeader";
 import { TypingIndicator } from "./TypingIndicator";
+import { ThreadPanel } from "./ThreadPanel";
 import type { Attachment, Channel, Message, User, TypingUser, MemberRole } from "@/types";
 
 interface Props {
@@ -27,7 +28,16 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [threadsOpen, setThreadsOpen] = useState(false);
+  const [threadSeed, setThreadSeed] = useState<Message | null>(null);
+  const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+  const [showJump, setShowJump] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+
+  function openThreadFromMessage(message: Message) {
+    setThreadSeed(message);
+    setThreadsOpen(true);
+  }
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -58,7 +68,24 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
     socket?.emit("channel:read", { channelId: channel.id });
   }, [channel.id, socket]);
 
-  useEffect(() => { markRead(); }, [channel.id, markRead]);
+  // Compute the "new messages" boundary from the saved read state BEFORE marking
+  // the channel read, so the divider survives this visit.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/channels/${channel.id}/read`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        const lastReadAt = d?.lastReadAt ? new Date(d.lastReadAt).getTime() : 0;
+        const firstUnread = initialMessages.find(
+          (m) => m.userId !== currentUser.id && new Date(m.createdAt).getTime() > lastReadAt
+        );
+        setFirstUnreadId(firstUnread?.id ?? null);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) markRead(); });
+    return () => { cancelled = true; };
+  }, [channel.id, initialMessages, currentUser.id, markRead]);
 
   useEffect(() => { scrollToBottom(); }, [channel.id, scrollToBottom]);
   useEffect(() => {
@@ -211,18 +238,47 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
 
   const canManage = ["OWNER", "ADMIN"].includes(currentUserRole);
   const pinnedMessageIds = new Set(pins.map((message) => message.id));
+  const [nsfwConfirmed, setNsfwConfirmed] = useState(false);
+  useEffect(() => { setNsfwConfirmed(false); }, [channel.id]);
+
+  if (channel.nsfw && !nsfwConfirmed) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center bg-dc-chat px-8 text-center">
+        <div className="text-5xl mb-4">🔞</div>
+        <h2 className="text-dc-text text-xl font-bold mb-2">#{channel.name}</h2>
+        <p className="text-dc-muted text-sm max-w-sm mb-5">
+          This is an age-restricted channel. Please confirm you are at least 18 years old and want to view its content.
+        </p>
+        <button
+          onClick={() => setNsfwConfirmed(true)}
+          className="rounded bg-dc-accent px-6 py-2 text-sm font-semibold text-white hover:bg-dc-accent-hover"
+        >
+          I&apos;m over 18 — continue
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden bg-dc-chat">
+    <div className="flex flex-1 overflow-hidden">
+    <div className="relative flex flex-col flex-1 overflow-hidden bg-dc-chat">
       <ChannelHeader
         channel={channel}
         pinnedMessages={pins}
         canManage={canManage}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onToggleThreads={() => { setThreadSeed(null); setThreadsOpen((o) => !o); }}
       />
 
-      <div ref={listRef} className="flex-1 overflow-y-auto scrollbar-thin">
+      <div
+        ref={listRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 300);
+        }}
+        className="flex-1 overflow-y-auto scrollbar-thin"
+      >
         {hasMore && (
           <div className="flex justify-center py-3">
             <button
@@ -256,9 +312,20 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
           onReaction={toggleReaction}
           onReply={setReplyTo}
           onTogglePin={togglePin}
+          onCreateThread={openThreadFromMessage}
           pinnedMessageIds={pinnedMessageIds}
+          firstUnreadId={firstUnreadId}
         />
       </div>
+
+      {showJump && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-24 right-6 z-10 rounded-full bg-dc-accent px-4 py-2 text-xs font-semibold text-white shadow-lg hover:bg-dc-accent-hover"
+        >
+          Jump to present ↓
+        </button>
+      )}
 
       <div className="shrink-0">
         <TypingIndicator typingUsers={typingUsers} />
@@ -275,6 +342,17 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
           serverId={channel.serverId}
         />
       </div>
+    </div>
+
+    {threadsOpen && (
+      <ThreadPanel
+        channelId={channel.id}
+        serverId={channel.serverId}
+        currentUser={currentUser}
+        seedFromMessage={threadSeed}
+        onClose={() => { setThreadsOpen(false); setThreadSeed(null); }}
+      />
+    )}
     </div>
   );
 }

@@ -35,15 +35,32 @@ export async function parseMentions(content: string, serverId: string): Promise<
 
   if (usernames.size === 0) return { userIds: [], mentionsEveryone };
 
-  // SQLite `in` is case-sensitive, so match usernames case-insensitively in JS.
-  const members = await prisma.serverMember.findMany({
-    where: { serverId },
-    select: { userId: true, user: { select: { username: true } } },
-  });
+  // SQLite `in` is case-sensitive, so match usernames/roles case-insensitively in JS.
+  const [members, roles] = await Promise.all([
+    prisma.serverMember.findMany({
+      where: { serverId },
+      select: { userId: true, user: { select: { username: true } } },
+    }),
+    prisma.serverRole.findMany({
+      where: { serverId },
+      select: { id: true, name: true },
+    }),
+  ]);
 
-  const userIds = members
-    .filter((m) => usernames.has(m.user.username.toLowerCase()))
-    .map((m) => m.userId);
+  const ids = new Set<string>();
+  for (const m of members) {
+    if (usernames.has(m.user.username.toLowerCase())) ids.add(m.userId);
+  }
 
-  return { userIds, mentionsEveryone };
+  // Role mentions (@RoleName, single-token): ping every member with that role.
+  const matchedRoleIds = roles.filter((r) => usernames.has(r.name.toLowerCase())).map((r) => r.id);
+  if (matchedRoleIds.length > 0) {
+    const memberRoles = await prisma.serverMemberRole.findMany({
+      where: { serverId, roleId: { in: matchedRoleIds } },
+      select: { member: { select: { userId: true } } },
+    });
+    for (const mr of memberRoles) ids.add(mr.member.userId);
+  }
+
+  return { userIds: Array.from(ids), mentionsEveryone };
 }

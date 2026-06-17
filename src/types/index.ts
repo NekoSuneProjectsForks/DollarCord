@@ -124,6 +124,7 @@ export interface Channel {
   description: string | null;
   type?: string;
   slowmodeSeconds?: number;
+  nsfw?: boolean;
   position: number;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -195,6 +196,7 @@ export interface Reaction {
 export interface Message {
   id: string;
   channelId: string;
+  threadId?: string | null;
   userId: string | null;
   botId?: string | null;
   content: string;

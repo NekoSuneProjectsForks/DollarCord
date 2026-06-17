@@ -4,6 +4,18 @@ import { prisma } from "@/lib/prisma";
 
 interface Params { params: { channelId: string } }
 
+// Return the user's last-read timestamp for this channel (for the "new messages" divider).
+export async function GET(req: NextRequest, { params }: Params) {
+  const user = await getCurrentUserFromReq(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const state = await prisma.channelReadState.findUnique({
+    where: { channelId_userId: { channelId: params.channelId, userId: user.id } },
+    select: { lastReadAt: true },
+  });
+  return NextResponse.json({ lastReadAt: state?.lastReadAt ?? null });
+}
+
 // Mark a channel as read up to now for the current user.
 export async function POST(req: NextRequest, { params }: Params) {
   const user = await getCurrentUserFromReq(req);

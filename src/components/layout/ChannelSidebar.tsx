@@ -49,6 +49,48 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
   const [eventAlertsEnabled, setEventAlertsEnabled] = useState(true);
   const [categories, setCategories] = useState<ChannelCategory[]>([]);
   const [unread, setUnread] = useState<UnreadMap>({});
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [supporters, setSupporters] = useState<{ count: number; tier: number; supporting: boolean }>({
+    count: 0,
+    tier: 0,
+    supporting: false,
+  });
+
+  useEffect(() => {
+    fetch(`/api/servers/${server.id}/supporters`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSupporters(d))
+      .catch(() => {});
+  }, [server.id]);
+
+  async function toggleSupport() {
+    const res = await fetch(`/api/servers/${server.id}/supporters`, {
+      method: supporters.supporting ? "DELETE" : "POST",
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setSupporters(d);
+      addToast(d.supporting ? "Thanks for supporting this server!" : "You stopped supporting this server.", "success");
+    }
+    setShowMenu(false);
+  }
+
+  // Persist collapsed categories per server.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`dc_collapsed_${server.id}`);
+      if (raw) setCollapsed(new Set(JSON.parse(raw)));
+    } catch {}
+  }, [server.id]);
+
+  function toggleCategory(id: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      try { localStorage.setItem(`dc_collapsed_${server.id}`, JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  }
 
   const canManage = ["OWNER", "ADMIN"].includes(currentUserRole);
   const activeChannelId = pathname.match(/\/servers\/[^/]+\/([^/]+)/)?.[1];
@@ -305,7 +347,14 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
             className="w-full flex items-center justify-between px-4 h-12 font-semibold text-dc-text hover:bg-dc-hover transition-colors border-b border-dc-border"
             onClick={() => setShowMenu((p) => !p)}
           >
-            <span className="truncate">{server.name}</span>
+            <span className="flex items-center gap-1.5 truncate">
+              {server.name}
+              {supporters.tier > 0 && (
+                <span className="shrink-0 rounded-full bg-dc-accent/20 px-1.5 text-[10px] font-bold text-dc-accent" title={`Supporter Tier ${supporters.tier} · ${supporters.count} supporters`}>
+                  ★{supporters.tier}
+                </span>
+              )}
+            </span>
             <span className="text-dc-muted ml-1">{showMenu ? "▲" : "▼"}</span>
           </button>
 
@@ -318,6 +367,13 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
                   onClick={() => { setShowInvite(true); setShowMenu(false); }}
                 >
                   Invite People
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 text-sm text-dc-text hover:bg-dc-hover transition-colors flex items-center justify-between"
+                  onClick={toggleSupport}
+                >
+                  <span>{supporters.supporting ? "★ Supporting" : "Support this Server"}</span>
+                  <span className="text-xs text-dc-faint">{supporters.count}</span>
                 </button>
                 {canManage && (
                   <button
@@ -466,12 +522,17 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
               .filter((c) => c.categoryId === cat.id)
               .sort((a, b) => a.position - b.position);
             if (inCat.length === 0) return null;
+            const isCollapsed = collapsed.has(cat.id);
             return (
               <div key={cat.id} className="mt-4">
-                <div className="px-2 mb-1">
-                  <span className="text-xs font-semibold text-dc-muted uppercase tracking-wide px-2">{cat.name}</span>
-                </div>
-                {inCat.map(renderChannelRow)}
+                <button
+                  onClick={() => toggleCategory(cat.id)}
+                  className="group flex w-full items-center gap-1 px-2 mb-1 text-dc-muted hover:text-dc-text"
+                >
+                  <span className={`text-[10px] transition-transform ${isCollapsed ? "-rotate-90" : ""}`}>▼</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide">{cat.name}</span>
+                </button>
+                {!isCollapsed && inCat.map(renderChannelRow)}
               </div>
             );
           })}

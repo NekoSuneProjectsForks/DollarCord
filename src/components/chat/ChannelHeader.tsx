@@ -22,13 +22,14 @@ interface Props {
   canManage: boolean;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  onToggleThreads?: () => void;
 }
 
 function getAuthorName(message: Message) {
   return message.user?.displayName ?? message.bot?.name ?? "Unknown User";
 }
 
-export function ChannelHeader({ channel, pinnedMessages, canManage, searchQuery, onSearchChange }: Props) {
+export function ChannelHeader({ channel, pinnedMessages, canManage, searchQuery, onSearchChange, onToggleThreads }: Props) {
   const router = useRouter();
   const [showSearch, setShowSearch] = useState(false);
   const [showPins, setShowPins] = useState(false);
@@ -86,6 +87,17 @@ export function ChannelHeader({ channel, pinnedMessages, canManage, searchQuery,
               title="Search messages"
             >
               🔍
+            </button>
+          )}
+
+          {/* Threads */}
+          {onToggleThreads && (
+            <button
+              onClick={onToggleThreads}
+              className="w-8 h-8 flex items-center justify-center text-dc-muted hover:text-dc-text hover:bg-dc-hover rounded transition-colors"
+              title="Threads"
+            >
+              🧵
             </button>
           )}
 

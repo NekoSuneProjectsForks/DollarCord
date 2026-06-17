@@ -172,6 +172,15 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
       socket.leave(`dm:${threadId}`);
     });
 
+    // Message threads
+    socket.on("thread:join", (threadId: string) => {
+      socket.join(`thread:${threadId}`);
+    });
+
+    socket.on("thread:leave", (threadId: string) => {
+      socket.leave(`thread:${threadId}`);
+    });
+
     // ---- Activity / status -------------------------------------------------
     // Lets a client optimistically broadcast a status change. The DB is the
     // source of truth (updated via the API routes), but this keeps every open

@@ -102,11 +102,12 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [ ] Import per-role permissions once a permission matrix exists (§4) 🟡
 
 ### 2.5 Threads 🟠
-- [ ] `Thread` model (parent channel, name, archived, auto-archive duration)
-- [ ] `ThreadMessage` (or reuse Message with `threadId`)
-- [ ] Create thread from a message or channel; thread list per channel
-- [ ] Real-time thread messages + unread state over Socket.IO
-- [ ] Import threads from Discord templates/exports (ties into §2.4)
+- [x] `Thread` model (parent channel, name, rootMessage, archived, lastMessageAt)
+- [x] Thread messages reuse `Message` via `threadId`
+- [x] Create thread from a message (🧵 action) or channel (header); thread list panel
+- [x] Real-time thread messages over Socket.IO (`thread:*` rooms)
+- [ ] Per-thread unread badges (channel-level unread shipped; thread-level pending) 🟡
+- [ ] Import threads from Discord templates/exports (ties into §2.4) 🟡
 
 ---
 
@@ -148,22 +149,26 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] Mention/unread badges + counts per channel (read-state model + live updates)
 - [x] Spoiler tags (`||x||`) + lightweight code-block syntax highlighting
 - [x] Slowmode per channel (enforced server-side; composer cooldown; header control)
+- [x] Threads (message threads): Thread model, create from message/channel, thread
+      panel, real-time replies, reuse of message rendering + composer
+- [x] "New messages" divider + jump-to-present (uses read-state)
 - [ ] Custom emoji & stickers (server-uploaded) 🟠
-- [ ] Threads (message threads) 🟡 — schema/UI is its own phase (§2.5)
-- [ ] Forum channels 🟢 — type exists; needs thread-list UI
+- [ ] Forum channels 🟢 — type exists; needs thread-list landing UI
 - [ ] Announcement channels + follow 🟢 — type exists; needs follow plumbing
 - [ ] Slash commands framework for bots 🟡
 - [ ] Message formatting toolbar + emoji picker (full unicode set) 🟡
-- [ ] Read receipts / "new messages" divider + jump-to-present 🟠
+- [ ] Read receipts (per-user seen markers) 🟠 — divider/jump shipped; seen-by pending
 - [ ] Link unfurling / OpenGraph embeds (generic) 🟡
 
 ### Structure & permissions
-- [ ] Channel categories / groups (collapsible) 🟠
+- [x] Channel categories / groups (collapsible, persisted per server)
+- [x] NSFW / age-gated channels (flag + create option + confirm gate)
+- [x] **Server Supporters** — community support/tier system + tier badge (boosting
+      analogue, intentionally NOT a paid "Nitro")
+- [x] Role mentions (`@RoleName` pings the role's members + highlight)
 - [ ] Granular per-channel/per-role permission matrix (not just OWNER/ADMIN/MEMBER) 🔴
-- [ ] Role hierarchy enforcement + role mentions 🟠
-- [ ] Channel-level overrides (private channels) 🟠
-- [ ] NSFW / age-gated channels 🟢
-- [ ] Server boosting / tiers analogue 🟢
+- [ ] Role hierarchy enforcement (mentions done; hierarchy gating pending) 🟠
+- [ ] Channel-level overrides (private channels) 🟠 — needs the permission matrix
 - [ ] Server discovery / public directory 🟢
 - [ ] Server templates (native, beyond Discord import) 🟢
 - [ ] AutoMod (keyword/spam/raid filters) 🟡
@@ -249,11 +254,17 @@ Shipped (all typecheck + `next build` clean):
 - Channel categories + ordering + import categories/nesting; ANNOUNCEMENT/FORUM channel types
 - Security: auth rate-limiting, active-session management, account delete + data export, password meter
 
+### Shipped in iteration 4
+- **Threads**: model + create-from-message/channel + panel + real-time replies
+- New-messages divider + jump-to-present; collapsible categories
+- NSFW/age-gated channels; role mentions (`@RoleName` pings members)
+- **Server Supporters** (boosting analogue, NOT Nitro) with tiers + badge
+
 ### Next up
-1. Threads (§2.5) — model + UI + real-time, then import (§2.4).
-2. Email transport → unlocks email verification/change + real password-reset delivery.
-3. Per-channel/per-role permission matrix (§4) — unlocks private channels + richer import.
-4. E2E-encrypted DMs (§3, §5) and/or 2FA TOTP — the remaining heavy security items.
-5. Custom emoji & stickers; full emoji picker; link unfurling.
+1. **Per-channel/per-role permission matrix** (§4, 🔴) — the big unlock for private
+   channels, role-hierarchy gating, and richer template import (per-role perms).
+2. Email transport → email verification/change + real password-reset delivery.
+3. E2E-encrypted DMs and/or 2FA TOTP — remaining heavy security items.
+4. Custom emoji & stickers; full emoji picker; link unfurling; AutoMod.
 
 > Live progress is tracked in the task list; checked items above are done & building.
