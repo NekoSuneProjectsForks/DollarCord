@@ -166,12 +166,18 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] **Server Supporters** — community support/tier system + tier badge (boosting
       analogue, intentionally NOT a paid "Nitro")
 - [x] Role mentions (`@RoleName` pings the role's members + highlight)
-- [ ] Granular per-channel/per-role permission matrix (not just OWNER/ADMIN/MEMBER) 🔴
-- [ ] Role hierarchy enforcement (mentions done; hierarchy gating pending) 🟠
-- [ ] Channel-level overrides (private channels) 🟠 — needs the permission matrix
-- [ ] Server discovery / public directory 🟢
-- [ ] Server templates (native, beyond Discord import) 🟢
-- [ ] AutoMod (keyword/spam/raid filters) 🟡
+- [x] **Granular per-channel/per-role permission matrix** — 14-flag bitfield on roles +
+      per-channel allow/deny overrides (EVERYONE/ROLE/MEMBER), Discord-style effective-
+      permission computation, enforced in message routes + channel page + sidebar visibility
+- [x] **Channel-level overrides / private channels** — permissions modal (tri-state per
+      role) + "Make Private" quick action; hidden channels filtered from the sidebar
+- [x] Role permission editing in Server Settings (per-role checkboxes)
+- [x] Role hierarchy: privilege-escalation guard (only owner can grant a server-managing role)
+- [x] **Server discovery / public directory** — `isPublic` toggle + `/discover` page + one-click join
+- [x] **Native server templates** — export structure (categories/channels/roles) as JSON + apply
+- [x] **AutoMod** (blocked words, max-mentions, invite-link blocking; managers exempt)
+- [ ] Full role-position hierarchy gating across all member actions 🟡 (escalation guard shipped)
+- [ ] Per-channel/per-member overrides UI (role + everyone shipped; per-member pending) 🟡
 
 ### Social
 - [ ] Friends system (request/accept/block) 🟠
@@ -260,11 +266,16 @@ Shipped (all typecheck + `next build` clean):
 - NSFW/age-gated channels; role mentions (`@RoleName` pings members)
 - **Server Supporters** (boosting analogue, NOT Nitro) with tiers + badge
 
+### Shipped in iteration 5
+- **Permission matrix**: 14-flag role bitfield + per-channel allow/deny overrides, effective-
+  permission engine, enforcement (view/send/mention-everyone) + private channels
+- Role permission editor; privilege-escalation guard
+- Server discovery (`/discover`) + native server templates (export/apply) + AutoMod
+
 ### Next up
-1. **Per-channel/per-role permission matrix** (§4, 🔴) — the big unlock for private
-   channels, role-hierarchy gating, and richer template import (per-role perms).
-2. Email transport → email verification/change + real password-reset delivery.
-3. E2E-encrypted DMs and/or 2FA TOTP — remaining heavy security items.
-4. Custom emoji & stickers; full emoji picker; link unfurling; AutoMod.
+1. Email transport → email verification/change + real password-reset delivery.
+2. E2E-encrypted DMs and/or 2FA TOTP — remaining heavy security items.
+3. Custom emoji & stickers; full emoji picker; link unfurling.
+4. Forum/announcement landing UIs + announcement follow; slash-command framework.
 
 > Live progress is tracked in the task list; checked items above are done & building.

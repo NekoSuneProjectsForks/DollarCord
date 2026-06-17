@@ -16,6 +16,7 @@ import { InviteModal } from "@/components/modals/InviteModal";
 import { ServerNotificationSettingsModal } from "@/components/modals/ServerNotificationSettingsModal";
 import { ServerPrivacySettingsModal } from "@/components/modals/ServerPrivacySettingsModal";
 import { ServerSettingsModal } from "@/components/settings/ServerSettingsModal";
+import { ChannelPermissionsModal } from "@/components/modals/ChannelPermissionsModal";
 import { formatShortDate, formatTime } from "@/lib/dateTime";
 import type { Channel, ChannelCategory, Server, MemberRole, ServerEvent, ServerUserSettings, UnreadMap } from "@/types";
 
@@ -44,6 +45,7 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
   const [showMenu, setShowMenu] = useState(false);
   const [editingChannel, setEditingChannel] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [permsChannel, setPermsChannel] = useState<Channel | null>(null);
   const [events, setEvents] = useState<ServerEvent[]>(initialEvents);
   const [selectedEvent, setSelectedEvent] = useState<ServerEvent | null>(null);
   const [eventAlertsEnabled, setEventAlertsEnabled] = useState(true);
@@ -158,6 +160,9 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
       }
     });
 
+    // Permission/visibility changed — re-fetch the (filtered) channel list.
+    socket.on("server:channels:refresh", () => router.refresh());
+
     socket.on("server:event:create", async ({ event }: { event: ServerEvent }) => {
       setEvents((prev) => {
         if (prev.some((existing) => existing.id === event.id)) return prev;
@@ -182,6 +187,7 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
       socket.off("server:channel:create");
       socket.off("server:channel:update");
       socket.off("server:channel:delete");
+      socket.off("server:channels:refresh");
       socket.off("server:event:create");
       socket.off("server:event:update");
       socket.off("server:event:delete");
@@ -304,6 +310,13 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
 
           {canManage && !isEditing && (
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+              <button
+                onClick={() => setPermsChannel(channel)}
+                className="w-5 h-5 flex items-center justify-center text-dc-muted hover:text-dc-text rounded text-xs"
+                title="Permissions"
+              >
+                🔒
+              </button>
               <button
                 onClick={() => { setEditingChannel(channel.id); setEditName(channel.name); }}
                 className="w-5 h-5 flex items-center justify-center text-dc-muted hover:text-dc-text rounded text-xs"
@@ -601,6 +614,14 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
           onClose={() => setShowSettings(false)}
           server={server}
           currentUserRole={currentUserRole}
+        />
+      )}
+      {permsChannel && (
+        <ChannelPermissionsModal
+          open={Boolean(permsChannel)}
+          onClose={() => setPermsChannel(null)}
+          channelId={permsChannel.id}
+          channelName={permsChannel.name}
         />
       )}
     </>

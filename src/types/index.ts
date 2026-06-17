@@ -25,6 +25,7 @@ export interface Server {
   iconUrl: string | null;
   ownerId: string;
   liveAnnounceChannelId?: string | null;
+  isPublic?: boolean;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -45,6 +46,7 @@ export interface ServerRole {
   name: string;
   color: string;
   position: number;
+  permissions?: number;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

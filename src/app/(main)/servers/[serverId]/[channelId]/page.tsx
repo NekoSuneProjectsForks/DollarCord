@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { VoiceChannelView } from "@/components/voice/VoiceChannelView";
+import { getChannelPermissions, has, Permission } from "@/lib/permissions";
 
 interface Props {
   params: { serverId: string; channelId: string };
@@ -24,6 +25,9 @@ export default async function ChannelPage({ params }: Props) {
     where: { serverId_userId: { serverId: params.serverId, userId: user.id } },
   });
   if (!member) notFound();
+
+  const channelPerms = await getChannelPermissions(channel.id, params.serverId, user.id);
+  if (!has(channelPerms, Permission.VIEW_CHANNEL)) notFound();
 
   if (channel.type === "VOICE") {
     return (

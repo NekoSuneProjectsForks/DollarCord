@@ -131,6 +131,23 @@ export function ServerRail({ user: _user, initialServers }: Props) {
             </div>
           </Link>
 
+          <Link href="/discover" className="group relative flex items-center" title="Discover servers">
+            <span
+              className={`absolute -left-3 w-1 rounded-r-full bg-dc-text transition-all ${
+                pathname.startsWith("/discover") ? "h-8" : "h-4 opacity-0 group-hover:opacity-100"
+              }`}
+            />
+            <div
+              className={`w-12 h-12 flex items-center justify-center transition-all duration-150 shadow-lg text-xl ${
+                pathname.startsWith("/discover")
+                  ? "rounded-2xl bg-dc-success text-white"
+                  : "rounded-full bg-dc-sidebar group-hover:rounded-2xl group-hover:bg-dc-success text-dc-success group-hover:text-white"
+              }`}
+            >
+              🧭
+            </div>
+          </Link>
+
           <div className="w-8 h-px bg-dc-divider my-1" />
 
           <div className="flex min-h-0 flex-1 w-full flex-col items-center gap-2 overflow-y-auto scrollbar-thin">

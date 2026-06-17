@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ChannelSidebar } from "@/components/layout/ChannelSidebar";
 import { MemberSidebar } from "@/components/layout/MemberSidebar";
+import { getServerChannelPermissions, has, Permission } from "@/lib/permissions";
 
 interface Props {
   children: React.ReactNode;
@@ -40,6 +41,12 @@ export default async function ServerLayout({ children, params }: Props) {
   const membership = server.members.find((m) => m.userId === user.id);
   if (!membership) notFound();
 
+  // Hide channels the member can't view (private channels via permission overrides).
+  const channelPerms = await getServerChannelPermissions(server.id, user.id);
+  const visibleChannels = server.channels.filter((c) =>
+    has(channelPerms[c.id] ?? 0, Permission.VIEW_CHANNEL)
+  );
+
   const typedMembers = server.members.map((m) => ({
     ...m,
     role: m.role as "OWNER" | "ADMIN" | "MEMBER",
@@ -61,7 +68,7 @@ export default async function ServerLayout({ children, params }: Props) {
     <div className="flex flex-1 overflow-hidden">
       <ChannelSidebar
         server={server}
-        channels={server.channels}
+        channels={visibleChannels}
         initialEvents={server.events.map((event) => ({
           ...event,
           currentUserParticipant: event.participants[0] ?? null,

@@ -3,6 +3,8 @@ import { getCurrentUserFromReq } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendMessageSchema } from "@/lib/validations";
 import { MESSAGE_INCLUDE, parseMentions } from "@/lib/messages";
+import { getChannelPermissions, has, Permission } from "@/lib/permissions";
+import { runAutomod } from "@/lib/automod";
 import { getIO } from "@/server/socketServer";
 
 interface Params { params: { channelId: string } }
@@ -18,6 +20,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     where: { serverId_userId: { serverId: channel.serverId, userId: user.id } },
   });
   if (!member) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const viewPerms = await getChannelPermissions(params.channelId, channel.serverId, user.id);
+  if (!has(viewPerms, Permission.VIEW_CHANNEL)) {
+    return NextResponse.json({ error: "You can't view this channel" }, { status: 403 });
+  }
 
   const cursor = req.nextUrl.searchParams.get("cursor");
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get("limit") ?? "50"), 100);
@@ -67,6 +74,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
+    // Permission gate: must be able to view + send in this channel.
+    const perms = await getChannelPermissions(params.channelId, channel.serverId, user.id);
+    if (!has(perms, Permission.VIEW_CHANNEL)) {
+      return NextResponse.json({ error: "You can't view this channel" }, { status: 403 });
+    }
+    if (!has(perms, Permission.SEND_MESSAGES)) {
+      return NextResponse.json({ error: "You don't have permission to send messages here" }, { status: 403 });
+    }
+
     // Slowmode: managers are exempt; everyone else must wait between messages.
     const isManager = ["OWNER", "ADMIN"].includes(member.role);
     if (channel.slowmodeSeconds > 0 && !isManager) {
@@ -105,6 +121,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       parsed.data.content,
       channel.serverId
     );
+
+    // AutoMod (managers exempt).
+    if (!isManager) {
+      const verdict = await runAutomod(
+        channel.serverId,
+        parsed.data.content,
+        mentionedUserIds.length + (mentionsEveryone ? 1 : 0)
+      );
+      if (verdict.blocked) {
+        return NextResponse.json({ error: verdict.reason ?? "Message blocked by AutoMod" }, { status: 400 });
+      }
+    }
+
+    // @everyone/@here only pings if the sender has MENTION_EVERYONE.
+    const finalMentionsEveryone = mentionsEveryone && has(perms, Permission.MENTION_EVERYONE);
     const attachments = parsed.data.attachments ?? [];
 
     const message = await prisma.message.create({
@@ -113,7 +144,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         userId: user.id,
         content: parsed.data.content,
         replyToId: parsed.data.replyToId ?? null,
-        mentionsEveryone,
+        mentionsEveryone: finalMentionsEveryone,
         mentions: { create: mentionedUserIds.map((userId) => ({ userId })) },
         attachments: {
           create: attachments.map((a) => ({
@@ -138,7 +169,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         channelId: params.channelId,
         serverId: channel.serverId,
         mentionedUserIds,
-        mentionsEveryone,
+        mentionsEveryone: finalMentionsEveryone,
         authorId: user.id,
       });
     } catch {}

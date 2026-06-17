@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/contexts/ToastContext";
+import { PERMISSION_LIST, has } from "@/lib/permissionFlags";
 import type { Bot, Channel, MemberRole, Server, ServerBan, ServerMember, ServerRole } from "@/types";
 
 interface Props {
@@ -21,8 +22,11 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
     description: server.description ?? "",
     iconUrl: server.iconUrl ?? "",
     liveAnnounceChannelId: server.liveAnnounceChannelId ?? "",
+    isPublic: Boolean(server.isPublic),
   });
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [automod, setAutomod] = useState({ enabled: false, blockedWords: "", maxMentions: 0, blockInvites: false });
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState("");
@@ -35,6 +39,21 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
   const [loadingManagement, setLoadingManagement] = useState(false);
   const [newRole, setNewRole] = useState({ name: "", color: "#7c6af7" });
   const [roleBusy, setRoleBusy] = useState<string | null>(null);
+  const [permsRoleId, setPermsRoleId] = useState<string | null>(null);
+
+  async function toggleRolePerm(role: ServerRole, bit: number) {
+    const current = role.permissions ?? 0;
+    const next = has(current, bit) ? current & ~bit : current | bit;
+    const res = await fetch(`/api/servers/${server.id}/roles/${role.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ permissions: next }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setRoles((prev) => prev.map((r) => (r.id === role.id ? d.role : r)));
+    }
+  }
   const [newBot, setNewBot] = useState({ name: "", username: "", avatarUrl: "" });
   const [botBusy, setBotBusy] = useState<string | null>(null);
   const [createdBotToken, setCreatedBotToken] = useState<string | null>(null);
@@ -45,8 +64,53 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
       description: server.description ?? "",
       iconUrl: server.iconUrl ?? "",
       liveAnnounceChannelId: server.liveAnnounceChannelId ?? "",
+      isPublic: Boolean(server.isPublic),
     });
   }, [server]);
+
+  useEffect(() => {
+    if (!open || currentUserRole === "MEMBER") return;
+    fetch(`/api/servers/${server.id}/automod`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.config && setAutomod({
+        enabled: Boolean(d.config.enabled),
+        blockedWords: d.config.blockedWords ?? "",
+        maxMentions: d.config.maxMentions ?? 0,
+        blockInvites: Boolean(d.config.blockInvites),
+      }))
+      .catch(() => {});
+  }, [open, server.id, currentUserRole]);
+
+  async function saveAutomod() {
+    const res = await fetch(`/api/servers/${server.id}/automod`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(automod),
+    });
+    if (res.ok) addToast("AutoMod settings saved.", "success");
+    else addToast("Failed to save AutoMod.", "error");
+  }
+
+  async function applyTemplate(file: File) {
+    setApplyingTemplate(true);
+    try {
+      const text = await file.text();
+      const template = JSON.parse(text);
+      const res = await fetch(`/api/servers/${server.id}/apply-template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template }),
+      });
+      const data = await res.json();
+      if (!res.ok) { addToast(data.error || "Failed to apply template", "error"); return; }
+      addToast(`Applied: ${data.createdChannels} channels, ${data.createdCategories} categories, ${data.createdRoles} roles.`, "success");
+      router.refresh();
+    } catch {
+      addToast("Could not read that template file.", "error");
+    } finally {
+      setApplyingTemplate(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -93,6 +157,7 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
           description: form.description || null,
           iconUrl: form.iconUrl || null,
           liveAnnounceChannelId: form.liveAnnounceChannelId || null,
+          isPublic: form.isPublic,
         }),
       });
       const data = await res.json();
@@ -313,6 +378,15 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
             When a member who linked a Twitch/Kick channel goes live, a “now live” message is posted here.
           </p>
         </div>
+        <label className="flex items-center gap-2 text-sm text-dc-muted">
+          <input
+            type="checkbox"
+            checked={form.isPublic}
+            onChange={(e) => setForm((c) => ({ ...c, isPublic: e.target.checked }))}
+            className="accent-dc-accent"
+          />
+          List this server in Discover (anyone can find &amp; join it)
+        </label>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-dc-muted hover:text-dc-text transition-colors">Cancel</button>
           <button type="submit" disabled={saving} className="px-4 py-2 bg-dc-accent hover:bg-dc-accent-hover disabled:opacity-50 text-white text-sm font-semibold rounded transition-colors">
@@ -357,19 +431,45 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
             ) : (
               <div className="space-y-2">
                 {roles.map((role) => (
-                  <div key={role.id} className="flex items-center justify-between gap-3 bg-dc-chat rounded px-3 py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: role.color }} />
-                      <span className="text-sm font-semibold truncate" style={{ color: role.color }}>{role.name}</span>
+                  <div key={role.id} className="bg-dc-chat rounded px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: role.color }} />
+                        <span className="text-sm font-semibold truncate" style={{ color: role.color }}>{role.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPermsRoleId((id) => (id === role.id ? null : role.id))}
+                          className="px-3 py-1.5 rounded bg-dc-hover text-xs font-semibold text-dc-text hover:bg-dc-border transition-colors"
+                        >
+                          {permsRoleId === role.id ? "Hide Perms" : "Permissions"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRole(role.id)}
+                          disabled={roleBusy === role.id}
+                          className="px-3 py-1.5 rounded bg-dc-danger/15 text-xs font-semibold text-dc-danger hover:bg-dc-danger/25 disabled:opacity-50 transition-colors"
+                        >
+                          {roleBusy === role.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRole(role.id)}
-                      disabled={roleBusy === role.id}
-                      className="px-3 py-1.5 rounded bg-dc-danger/15 text-xs font-semibold text-dc-danger hover:bg-dc-danger/25 disabled:opacity-50 transition-colors"
-                    >
-                      {roleBusy === role.id ? "Deleting..." : "Delete"}
-                    </button>
+                    {permsRoleId === role.id && (
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 border-t border-dc-border pt-2">
+                        {PERMISSION_LIST.map((p) => (
+                          <label key={p.key} className="flex items-center gap-2 text-xs text-dc-muted">
+                            <input
+                              type="checkbox"
+                              checked={has(role.permissions ?? 0, p.bit)}
+                              onChange={() => toggleRolePerm(role, p.bit)}
+                              className="accent-dc-accent"
+                            />
+                            {p.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -482,6 +582,71 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {currentUserRole !== "MEMBER" && (
+        <div className="border-t border-dc-border pt-5 mb-6 space-y-5">
+          {/* AutoMod */}
+          <div>
+            <h3 className="text-dc-text font-semibold mb-2">AutoMod</h3>
+            <label className="flex items-center gap-2 text-sm text-dc-muted mb-2">
+              <input type="checkbox" checked={automod.enabled} onChange={(e) => setAutomod((a) => ({ ...a, enabled: e.target.checked }))} className="accent-dc-accent" />
+              Enable AutoMod
+            </label>
+            <label className="block text-xs font-semibold text-dc-muted uppercase tracking-wide mb-1">Blocked words (comma or newline separated)</label>
+            <textarea
+              value={automod.blockedWords}
+              onChange={(e) => setAutomod((a) => ({ ...a, blockedWords: e.target.value }))}
+              rows={2}
+              className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm resize-none mb-2"
+              placeholder="spam, scam, …"
+            />
+            <div className="flex flex-wrap items-center gap-4 mb-2">
+              <label className="text-sm text-dc-muted flex items-center gap-2">
+                Max mentions
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={automod.maxMentions}
+                  onChange={(e) => setAutomod((a) => ({ ...a, maxMentions: Number(e.target.value) }))}
+                  className="w-20 bg-dc-input text-dc-text px-2 py-1 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
+                />
+                <span className="text-xs text-dc-faint">(0 = off)</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-dc-muted">
+                <input type="checkbox" checked={automod.blockInvites} onChange={(e) => setAutomod((a) => ({ ...a, blockInvites: e.target.checked }))} className="accent-dc-accent" />
+                Block invite links
+              </label>
+            </div>
+            <button onClick={saveAutomod} className="px-4 py-2 bg-dc-accent hover:bg-dc-accent-hover text-white text-sm font-semibold rounded transition-colors">
+              Save AutoMod
+            </button>
+          </div>
+
+          {/* Templates */}
+          <div className="border-t border-dc-border pt-4">
+            <h3 className="text-dc-text font-semibold mb-2">Server Template</h3>
+            <p className="text-dc-muted text-sm mb-3">Export this server&apos;s structure (categories, channels, roles) or apply a saved template.</p>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/api/servers/${server.id}/export-template`}
+                className="px-4 py-2 bg-dc-hover hover:bg-dc-border text-dc-text text-sm font-semibold rounded transition-colors"
+              >
+                Export Template
+              </a>
+              <label className="px-4 py-2 bg-dc-hover hover:bg-dc-border text-dc-text text-sm font-semibold rounded transition-colors cursor-pointer">
+                {applyingTemplate ? "Applying…" : "Apply Template"}
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) applyTemplate(f); e.target.value = ""; }}
+                />
+              </label>
+            </div>
           </div>
         </div>
       )}

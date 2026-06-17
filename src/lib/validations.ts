@@ -56,6 +56,7 @@ export const updateServerSchema = z.object({
   description: z.string().max(500).nullable().optional(),
   iconUrl: z.string().url().nullable().optional(),
   liveAnnounceChannelId: z.string().nullable().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export const joinServerSchema = z.object({
@@ -132,6 +133,27 @@ export const updateMemberRoleSchema = z.object({
 export const createServerRoleSchema = z.object({
   name: z.string().trim().min(1, "Role name is required").max(32, "Role name must be at most 32 characters"),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Role color must be a hex color").default("#7c6af7"),
+  permissions: z.number().int().min(0).optional(),
+});
+
+export const automodSchema = z.object({
+  enabled: z.boolean().optional(),
+  blockedWords: z.string().max(4000).optional(),
+  maxMentions: z.number().int().min(0).max(100).optional(),
+  blockInvites: z.boolean().optional(),
+});
+
+export const channelPermissionsSchema = z.object({
+  overrides: z
+    .array(
+      z.object({
+        targetType: z.enum(["EVERYONE", "ROLE", "MEMBER"]),
+        targetId: z.string().min(1),
+        allow: z.number().int().min(0),
+        deny: z.number().int().min(0),
+      })
+    )
+    .max(100),
 });
 
 export const updateServerRoleSchema = createServerRoleSchema.partial();

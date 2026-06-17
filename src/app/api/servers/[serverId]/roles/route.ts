@@ -46,6 +46,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         serverId: params.serverId,
         name: parsed.data.name,
         color: parsed.data.color,
+        permissions: parsed.data.permissions ?? 0,
         position: (lastRole?.position ?? -1) + 1,
       },
     });

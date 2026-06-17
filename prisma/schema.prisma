@@ -64,6 +64,7 @@ model Server {
   iconUrl               String?
   ownerId               String
   liveAnnounceChannelId String?  // channel to post "now live" announcements
+  isPublic              Boolean  @default(false) // listed in server discovery
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -79,6 +80,20 @@ model Server {
   events       ServerEvent[]
   categories   ChannelCategory[]
   supporters   ServerSupporter[]
+  automod      ServerAutomod?
+}
+
+// Per-server AutoMod configuration (keyword / mention-spam / invite filters).
+model ServerAutomod {
+  id           String   @id @default(cuid())
+  serverId     String   @unique
+  enabled      Boolean  @default(false)
+  blockedWords String   @default("") // newline/comma separated
+  maxMentions  Int      @default(0)  // 0 = unlimited
+  blockInvites Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
 }
 
 // "Server Supporters" — DollarCord's community-support/tier system (a boosting
@@ -138,13 +153,14 @@ model ServerMember {
 }
 
 model ServerRole {
-  id        String   @id @default(cuid())
-  serverId  String
-  name      String
-  color     String   @default("#7c6af7")
-  position  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  serverId    String
+  name        String
+  color       String   @default("#7c6af7")
+  position    Int      @default(0)
+  permissions Int      @default(0) // permission bitfield (see lib/permissions.ts)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   server  Server             @relation(fields: [serverId], references: [id], onDelete: Cascade)
   members ServerMemberRole[]
@@ -232,6 +248,25 @@ model Channel {
   events         ServerEvent[]
   readStates     ChannelReadState[]
   threads        Thread[]
+  overrides      ChannelPermissionOverride[]
+}
+
+// Per-channel permission overrides. targetType: EVERYONE | ROLE | MEMBER.
+// `allow`/`deny` are permission bitfields applied over the member's base perms.
+model ChannelPermissionOverride {
+  id         String   @id @default(cuid())
+  channelId  String
+  targetType String // EVERYONE | ROLE | MEMBER
+  targetId   String // role id, user id, or "everyone"
+  allow      Int      @default(0)
+  deny       Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, targetType, targetId])
+  @@index([channelId])
 }
 
 model Thread {
