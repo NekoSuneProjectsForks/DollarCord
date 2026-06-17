@@ -29,6 +29,8 @@ model User {
   sessions         Session[]
   activities       Activity[]
   passwordResets   PasswordResetToken[]
+  mentions         Mention[]
+  channelReadStates ChannelReadState[]
   ownedServers     Server[]                   @relation("ServerOwner")
   serverMembers    ServerMember[]
   messages         Message[]
@@ -74,6 +76,7 @@ model Server {
   bots         Bot[]
   userSettings ServerUserSettings[]
   events       ServerEvent[]
+  categories   ChannelCategory[]
 }
 
 model ServerUserSettings {
@@ -192,19 +195,47 @@ model Invite {
 }
 
 model Channel {
-  id          String   @id @default(cuid())
-  serverId    String
-  name        String
-  description String?
-  type        String   @default("TEXT") // TEXT | VOICE
-  position    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  serverId        String
+  categoryId      String?
+  name            String
+  description     String?
+  type            String   @default("TEXT") // TEXT | VOICE | ANNOUNCEMENT | FORUM
+  slowmodeSeconds Int      @default(0)
+  position        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  server         Server          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  server         Server            @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  category       ChannelCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   messages       Message[]
   pinnedMessages PinnedMessage[]
   events         ServerEvent[]
+  readStates     ChannelReadState[]
+}
+
+model ChannelCategory {
+  id        String   @id @default(cuid())
+  serverId  String
+  name      String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  server   Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channels Channel[]
+}
+
+model ChannelReadState {
+  id         String   @id @default(cuid())
+  channelId  String
+  userId     String
+  lastReadAt DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([userId])
 }
 
 model ServerEvent {
@@ -241,24 +272,54 @@ model ServerEventParticipant {
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  channelId String
-  userId    String?
-  botId     String?
-  content   String
-  edited    Boolean  @default(false)
-  deleted   Boolean  @default(false)
-  replyToId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  channelId        String
+  userId           String?
+  botId            String?
+  content          String
+  edited           Boolean  @default(false)
+  deleted          Boolean  @default(false)
+  mentionsEveryone Boolean  @default(false)
+  replyToId        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  channel   Channel         @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user      User?           @relation(fields: [userId], references: [id])
-  bot       Bot?            @relation(fields: [botId], references: [id])
-  replyTo   Message?        @relation("MessageReply", fields: [replyToId], references: [id])
-  replies   Message[]       @relation("MessageReply")
-  reactions Reaction[]
-  pinnedIn  PinnedMessage[]
+  channel     Channel         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user        User?           @relation(fields: [userId], references: [id])
+  bot         Bot?            @relation(fields: [botId], references: [id])
+  replyTo     Message?        @relation("MessageReply", fields: [replyToId], references: [id])
+  replies     Message[]       @relation("MessageReply")
+  reactions   Reaction[]
+  pinnedIn    PinnedMessage[]
+  attachments Attachment[]
+  mentions    Mention[]
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  messageId   String
+  url         String
+  name        String
+  contentType String
+  size        Int      @default(0)
+  width       Int?
+  height      Int?
+  createdAt   DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model Mention {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }
 
 model Reaction {

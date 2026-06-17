@@ -1,9 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Channel, Message } from "@/types";
 import { Modal } from "@/components/ui/Modal";
 import { formatShortDate } from "@/lib/dateTime";
+
+const SLOWMODE_OPTIONS: { label: string; value: number }[] = [
+  { label: "Off", value: 0 },
+  { label: "5s", value: 5 },
+  { label: "10s", value: 10 },
+  { label: "30s", value: 30 },
+  { label: "1m", value: 60 },
+  { label: "5m", value: 300 },
+  { label: "15m", value: 900 },
+];
 
 interface Props {
   channel: Channel & { server: { name: string } };
@@ -18,8 +29,20 @@ function getAuthorName(message: Message) {
 }
 
 export function ChannelHeader({ channel, pinnedMessages, canManage, searchQuery, onSearchChange }: Props) {
+  const router = useRouter();
   const [showSearch, setShowSearch] = useState(false);
   const [showPins, setShowPins] = useState(false);
+  const [showSlowmode, setShowSlowmode] = useState(false);
+
+  async function setSlowmode(value: number) {
+    setShowSlowmode(false);
+    await fetch(`/api/channels/${channel.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slowmodeSeconds: value }),
+    });
+    router.refresh();
+  }
 
   return (
     <>
@@ -74,6 +97,40 @@ export function ChannelHeader({ channel, pinnedMessages, canManage, searchQuery,
           >
             📌
           </button>
+
+          {/* Slowmode (managers) */}
+          {canManage && (
+            <div className="relative">
+              <button
+                onClick={() => setShowSlowmode((s) => !s)}
+                className={`w-8 h-8 flex items-center justify-center rounded transition-colors hover:bg-dc-hover ${
+                  channel.slowmodeSeconds ? "text-dc-warning" : "text-dc-muted hover:text-dc-text"
+                }`}
+                title={channel.slowmodeSeconds ? `Slowmode: ${channel.slowmodeSeconds}s` : "Slowmode"}
+              >
+                ⏱
+              </button>
+              {showSlowmode && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowSlowmode(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-lg border border-dc-border bg-dc-rail shadow-xl">
+                    <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-dc-faint">Slowmode</p>
+                    {SLOWMODE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setSlowmode(opt.value)}
+                        className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-dc-hover ${
+                          (channel.slowmodeSeconds ?? 0) === opt.value ? "text-dc-accent" : "text-dc-text"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

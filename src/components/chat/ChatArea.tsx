@@ -7,7 +7,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ChannelHeader } from "./ChannelHeader";
 import { TypingIndicator } from "./TypingIndicator";
-import type { Channel, Message, User, TypingUser, MemberRole } from "@/types";
+import type { Attachment, Channel, Message, User, TypingUser, MemberRole } from "@/types";
 
 interface Props {
   channel: Channel & { server: { name: string } };
@@ -51,6 +51,15 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
     setPins(data.pins ?? []);
   }, [channel.id]);
 
+  // Mark the channel read when opened and whenever new messages arrive while
+  // it's the active view (clears the sidebar unread/mention badge).
+  const markRead = useCallback(() => {
+    fetch(`/api/channels/${channel.id}/read`, { method: "POST" }).catch(() => {});
+    socket?.emit("channel:read", { channelId: channel.id });
+  }, [channel.id, socket]);
+
+  useEffect(() => { markRead(); }, [channel.id, markRead]);
+
   useEffect(() => { scrollToBottom(); }, [channel.id, scrollToBottom]);
   useEffect(() => {
     // Scroll to bottom when new messages arrive (if already near bottom)
@@ -73,6 +82,8 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
         if (prev.find((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
+      // We're actively viewing this channel, so keep it marked read.
+      markRead();
     });
 
     socket.on("channel:message:update", (msg: Message) => {
@@ -112,13 +123,13 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
       socket.off("typing:start");
       socket.off("typing:stop");
     };
-  }, [socket, channel.id, currentUser.id, refreshPins]);
+  }, [socket, channel.id, currentUser.id, refreshPins, markRead]);
 
-  async function sendMessage(content: string) {
+  async function sendMessage(content: string, attachments: Attachment[] = []) {
     const res = await fetch(`/api/channels/${channel.id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, replyToId: replyTo?.id ?? null }),
+      body: JSON.stringify({ content, replyToId: replyTo?.id ?? null, attachments }),
     });
     if (!res.ok) {
       const d = await res.json();
@@ -259,6 +270,9 @@ export function ChatArea({ channel, currentUser, currentUserRole, initialMessage
           onCancelReply={() => setReplyTo(null)}
           socket={socket}
           isDM={false}
+          slowmodeSeconds={channel.slowmodeSeconds ?? 0}
+          isManager={canManage}
+          serverId={channel.serverId}
         />
       </div>
     </div>

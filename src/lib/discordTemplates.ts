@@ -1,6 +1,8 @@
 const TEMPLATE_CODE_PATTERN = /(?:discord\.new\/|discord(?:app)?\.com\/template\/|discord(?:app)?\.com\/guild-template\/)?([a-zA-Z0-9-]{2,})/;
 
 export interface DiscordTemplateChannel {
+  id?: number | string;
+  parent_id?: number | string | null;
   name?: string;
   type?: number;
   topic?: string | null;

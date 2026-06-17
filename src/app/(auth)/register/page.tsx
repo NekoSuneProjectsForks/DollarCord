@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { PasswordStrength } from "@/components/ui/PasswordStrength";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -118,6 +119,7 @@ export default function RegisterPage() {
               className="w-full bg-dc-input text-dc-text px-3 py-2.5 rounded-md border border-dc-border focus:border-dc-accent focus:outline-none focus:ring-1 focus:ring-dc-accent text-sm"
               placeholder="At least 8 characters"
             />
+            <PasswordStrength password={form.password} />
           </div>
 
           <button

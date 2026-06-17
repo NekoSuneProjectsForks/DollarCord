@@ -97,8 +97,8 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] Import **roles** (name + color, Discord int → hex, skips @everyone)
 - [x] Import **server name & description** (opt-in toggle)
 - [x] Import modal toggles for voice / roles / server name
-- [ ] Import categories / channel ordering & nesting 🟡
-- [ ] Import threads from a template/source (needs Threads, §4) 🟡
+- [x] Import categories / channel ordering & nesting (parent_id → ChannelCategory)
+- [ ] Import threads from a template/source (needs Threads, §2.5) 🟡
 - [ ] Import per-role permissions once a permission matrix exists (§4) 🟡
 
 ### 2.5 Threads 🟠
@@ -117,19 +117,20 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
       still TODO — dev mode surfaces the link.
 - [x] **Username change** (uniqueness + 1-hour cooldown)
 - [x] **Change password while logged in** (revokes other sessions)
-- [ ] Email change (with re-verification) 🟠
-- [ ] Email verification on signup 🟠
+- [x] **Active-session management** (list devices, revoke one, "log out everywhere")
+- [x] **Rate limiting + brute-force lockout** on auth endpoints (login/register/reset)
+- [x] **Account deletion / data export** (GDPR JSON export; delete owned servers + account)
+- [x] Password strength meter (length + character-class heuristic) on register & change
+- [ ] Email change (with re-verification) 🟠 — needs an email transport
+- [ ] Email verification on signup 🟠 — needs an email transport
 - [ ] **End-to-end encryption for DMs** (per-device keypair, libsodium/WebCrypto;
       server stores ciphertext only) 🟠
 - [ ] **Encryption at rest** for sensitive columns (DM bodies, RPC tokens) so a DB
       dump leaks nothing readable 🟠
 - [ ] 2FA / TOTP + backup codes 🟠
-- [ ] Active-session management (list devices, revoke, "log out everywhere") 🟡
-- [ ] Rate limiting + brute-force lockout on auth endpoints 🔴
 - [ ] CSRF tokens on state-changing routes 🟠
-- [ ] Password strength meter + breach (HIBP) check 🟢
+- [ ] Breach (HIBP) check on passwords 🟢
 - [ ] Audit log of security-sensitive actions 🟡
-- [ ] Account deletion / data export (GDPR) 🟡
 
 > **Note on "data no one can see":** true zero-knowledge means the server itself
 > cannot read it — that requires client-side E2E encryption (keys never leave the
@@ -141,19 +142,19 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 ## 4. Discord parity gaps (not yet built)
 
 ### Messaging
-- [ ] File / image / video attachments + uploads 🔴
-- [ ] Drag-drop & paste upload, image gallery/lightbox 🟠
+- [x] File / image / video attachments + uploads (local-disk `/api/upload` → `/public/uploads`)
+- [x] Drag-drop & paste upload + image lightbox (gallery view still pending)
+- [x] @mentions (users + @everyone/@here) with autocomplete + highlight + "mentions you"
+- [x] Mention/unread badges + counts per channel (read-state model + live updates)
+- [x] Spoiler tags (`||x||`) + lightweight code-block syntax highlighting
+- [x] Slowmode per channel (enforced server-side; composer cooldown; header control)
 - [ ] Custom emoji & stickers (server-uploaded) 🟠
-- [ ] @mentions (users/roles/@everyone/@here) with autocomplete + highlight 🔴
-- [ ] Mention/unread badges + notification counts per channel/server 🔴
-- [ ] Threads (message threads) 🟡
-- [ ] Forum channels 🟢
-- [ ] Announcement channels + follow 🟢
+- [ ] Threads (message threads) 🟡 — schema/UI is its own phase (§2.5)
+- [ ] Forum channels 🟢 — type exists; needs thread-list UI
+- [ ] Announcement channels + follow 🟢 — type exists; needs follow plumbing
 - [ ] Slash commands framework for bots 🟡
 - [ ] Message formatting toolbar + emoji picker (full unicode set) 🟡
-- [ ] Spoiler tags, code-block syntax highlighting 🟡
 - [ ] Read receipts / "new messages" divider + jump-to-present 🟠
-- [ ] Slowmode per channel 🟡
 - [ ] Link unfurling / OpenGraph embeds (generic) 🟡
 
 ### Structure & permissions
@@ -242,10 +243,17 @@ Shipped (all typecheck + `next build` clean):
 - Desktop companion agent (`agent/`) for automatic game detection + game directory
 - Join-game / activity invites (joinUrl + party occupancy)
 
+### Shipped in iteration 3
+- Attachments/uploads (drag/paste/picker + lightbox), @mentions (autocomplete + highlight + badges),
+  unread/mention counts (read-state), slowmode, spoilers + code highlighting
+- Channel categories + ordering + import categories/nesting; ANNOUNCEMENT/FORUM channel types
+- Security: auth rate-limiting, active-session management, account delete + data export, password meter
+
 ### Next up
 1. Threads (§2.5) — model + UI + real-time, then import (§2.4).
-2. Email transport for password reset; rate limiting on auth (§3, §6).
+2. Email transport → unlocks email verification/change + real password-reset delivery.
 3. Per-channel/per-role permission matrix (§4) — unlocks private channels + richer import.
-4. Package the desktop agent as a tray app / installer (§2.2).
+4. E2E-encrypted DMs (§3, §5) and/or 2FA TOTP — the remaining heavy security items.
+5. Custom emoji & stickers; full emoji picker; link unfurling.
 
 > Live progress is tracked in the task list; checked items above are done & building.

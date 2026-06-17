@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes, createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requestPasswordResetSchema } from "@/lib/validations";
+import { clientIp, rateLimit } from "@/lib/rateLimit";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -12,6 +13,11 @@ function hashToken(token: string): string {
 // transport is wired up, we surface the token in dev only so the flow is usable.
 export async function POST(req: NextRequest) {
   try {
+    const limit = rateLimit(`pwreset:${clientIp(req)}`, 5, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return NextResponse.json({ ok: true }); // silent to avoid enumeration/timing signals
+    }
+
     const body = await req.json();
     const parsed = requestPasswordResetSchema.safeParse(body);
     if (!parsed.success) {

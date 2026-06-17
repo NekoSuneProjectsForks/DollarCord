@@ -69,7 +69,8 @@ export const createChannelSchema = z.object({
     .max(100)
     .regex(/^[a-z0-9-]+$/, "Channel name can only contain lowercase letters, numbers, and hyphens"),
   description: z.string().max(256).nullable().optional(),
-  type: z.enum(["TEXT", "VOICE"]).default("TEXT").optional(),
+  type: z.enum(["TEXT", "VOICE", "ANNOUNCEMENT", "FORUM"]).default("TEXT").optional(),
+  categoryId: z.string().nullable().optional(),
 });
 
 export const updateChannelSchema = z.object({
@@ -80,15 +81,29 @@ export const updateChannelSchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .optional(),
   description: z.string().max(256).nullable().optional(),
+  categoryId: z.string().nullable().optional(),
+  slowmodeSeconds: z.number().int().min(0).max(21600).optional(),
 });
 
-export const sendMessageSchema = z.object({
-  content: z
-    .string()
-    .min(1, "Message cannot be empty")
-    .max(4000, "Message is too long"),
-  replyToId: z.string().nullable().optional(),
+export const attachmentInputSchema = z.object({
+  url: z.string().min(1).max(1024),
+  name: z.string().min(1).max(256),
+  contentType: z.string().min(1).max(128),
+  size: z.number().int().min(0).max(100 * 1024 * 1024),
+  width: z.number().int().positive().nullable().optional(),
+  height: z.number().int().positive().nullable().optional(),
 });
+
+export const sendMessageSchema = z
+  .object({
+    content: z.string().max(4000, "Message is too long").default(""),
+    replyToId: z.string().nullable().optional(),
+    attachments: z.array(attachmentInputSchema).max(10, "Too many attachments").optional(),
+  })
+  .refine((d) => d.content.trim().length > 0 || (d.attachments && d.attachments.length > 0), {
+    message: "Message cannot be empty",
+    path: ["content"],
+  });
 
 export const editMessageSchema = z.object({
   content: z

@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
+import { PasswordStrength } from "@/components/ui/PasswordStrength";
+import { formatDate } from "@/lib/dateTime";
 import type { User } from "@/types";
 
 interface Props { user: User }
+
+interface SessionInfo {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  current: boolean;
+}
 
 export function AccountSettings({ user }: Props) {
   const router = useRouter();
@@ -18,6 +27,44 @@ export function AccountSettings({ user }: Props) {
 
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [savingPw, setSavingPw] = useState(false);
+
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [deletePw, setDeletePw] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  function loadSessions() {
+    fetch("/api/account/sessions")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSessions(d.sessions ?? []))
+      .catch(() => {});
+  }
+  useEffect(loadSessions, []);
+
+  async function revokeSession(id?: string) {
+    await fetch(`/api/account/sessions${id ? `?id=${id}` : ""}`, { method: "DELETE" });
+    addToast(id ? "Session revoked." : "Other sessions logged out.", "success");
+    loadSessions();
+  }
+
+  async function deleteAccount() {
+    if (!confirm("Permanently delete your account and all servers you own? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deletePw }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error || "Failed to delete account", "error");
+        return;
+      }
+      window.location.href = "/login";
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function changeUsername(e: React.FormEvent) {
     e.preventDefault();
@@ -134,6 +181,7 @@ export function AccountSettings({ user }: Props) {
               className={inputCls}
               autoComplete="new-password"
             />
+            <PasswordStrength password={pw.next} />
           </div>
           <div>
             <label className={labelCls}>Confirm New Password</label>
@@ -154,6 +202,74 @@ export function AccountSettings({ user }: Props) {
           {savingPw ? "Saving…" : "Change Password"}
         </button>
       </form>
+
+      {/* Active sessions */}
+      <div className="bg-dc-sidebar rounded-lg p-4 mb-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-dc-text font-semibold">Active Sessions</h3>
+          {sessions.length > 1 && (
+            <button onClick={() => revokeSession()} className="text-xs text-dc-accent hover:underline">
+              Log out everywhere else
+            </button>
+          )}
+        </div>
+        {sessions.length === 0 ? (
+          <p className="text-dc-muted text-sm">No active sessions.</p>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between rounded bg-dc-chat px-3 py-2 text-sm">
+                <div>
+                  <p className="text-dc-text">
+                    Session {s.current && <span className="text-dc-success text-xs">(this device)</span>}
+                  </p>
+                  <p className="text-dc-faint text-xs">Signed in {formatDate(s.createdAt)}</p>
+                </div>
+                {!s.current && (
+                  <button onClick={() => revokeSession(s.id)} className="text-xs text-dc-danger hover:underline">
+                    Revoke
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Data export */}
+      <div className="bg-dc-sidebar rounded-lg p-4 mb-6 space-y-3">
+        <h3 className="text-dc-text font-semibold">Your Data</h3>
+        <p className="text-dc-muted text-sm">Download a copy of your profile, messages, DMs, and memberships.</p>
+        <a
+          href="/api/account/export"
+          className="inline-block px-5 py-2 bg-dc-hover hover:bg-dc-border text-dc-text text-sm font-semibold rounded transition-colors"
+        >
+          Export My Data
+        </a>
+      </div>
+
+      {/* Delete account */}
+      <div className="rounded-lg border border-dc-danger/20 bg-dc-danger/10 p-4 space-y-3">
+        <h3 className="text-dc-danger font-semibold">Delete Account</h3>
+        <p className="text-dc-muted text-sm">
+          Permanently deletes your account and every server you own. Enter your password to confirm.
+        </p>
+        <input
+          type="password"
+          value={deletePw}
+          onChange={(e) => setDeletePw(e.target.value)}
+          placeholder="Current password"
+          autoComplete="current-password"
+          className={inputCls}
+        />
+        <button
+          onClick={deleteAccount}
+          disabled={deleting || !deletePw}
+          className="px-5 py-2 bg-dc-danger hover:bg-dc-danger-hover disabled:opacity-50 text-white text-sm font-semibold rounded transition-colors"
+        >
+          {deleting ? "Deleting…" : "Delete My Account"}
+        </button>
+      </div>
     </>
   );
 }

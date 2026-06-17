@@ -46,8 +46,26 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const importVoice = parsed.data.importVoiceChannels ?? true;
   const importRoles = parsed.data.importRoles ?? true;
+  const CATEGORY_TYPE = 4;
 
   const sourceChannels = template.serialized_source_guild.channels ?? [];
+
+  // Create categories first and remember source-id -> new category id.
+  const existingCategoryCount = await prisma.channelCategory.count({ where: { serverId: params.serverId } });
+  let categoryPosition = existingCategoryCount;
+  const categoryMap = new Map<string, string>();
+  const createdCategories = [];
+  for (const cat of sourceChannels
+    .filter((c) => c.type === CATEGORY_TYPE)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))) {
+    if (cat.id == null || !cat.name) continue;
+    const created = await prisma.channelCategory.create({
+      data: { serverId: params.serverId, name: cat.name.slice(0, 100), position: categoryPosition++ },
+    });
+    categoryMap.set(String(cat.id), created.id);
+    createdCategories.push(created);
+  }
+
   const channelInputs = sourceChannels
     .filter((channel) =>
       TEXT_CHANNEL_TYPES.has(channel.type ?? -1) ||
@@ -58,6 +76,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       name: normalizeChannelName(channel.name ?? ""),
       description: channel.topic?.slice(0, 256) ?? null,
       type: VOICE_CHANNEL_TYPES.has(channel.type ?? -1) ? "VOICE" : "TEXT",
+      categoryId: channel.parent_id != null ? categoryMap.get(String(channel.parent_id)) ?? null : null,
     }))
     .filter((channel) => channel.name && !existingNames.has(channel.name))
     .slice(0, 100);
@@ -71,6 +90,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         name: channel.name,
         description: channel.description,
         type: channel.type,
+        categoryId: channel.categoryId,
         position: nextPosition++,
       },
     });
@@ -121,7 +141,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
   }
 
-  if (createdChannels.length === 0 && createdRoles.length === 0 && !parsed.data.importServerName) {
+  if (
+    createdChannels.length === 0 &&
+    createdRoles.length === 0 &&
+    createdCategories.length === 0 &&
+    !parsed.data.importServerName
+  ) {
     return NextResponse.json({ error: "Nothing new to import from that template" }, { status: 400 });
   }
 

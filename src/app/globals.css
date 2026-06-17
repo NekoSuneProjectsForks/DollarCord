@@ -87,4 +87,46 @@
     margin: 4px 0;
     color: #8d9099;
   }
+
+  /* Spoilers: blurred until clicked (focused). */
+  .message-content .spoiler {
+    background: #1e1f22;
+    color: transparent;
+    border-radius: 3px;
+    padding: 0 2px;
+    cursor: pointer;
+    filter: blur(4px) brightness(0.6);
+    transition: filter 0.1s ease;
+    outline: none;
+  }
+  .message-content .spoiler:focus,
+  .message-content .spoiler.revealed {
+    color: #e3e5e8;
+    filter: none;
+    background: rgba(0, 0, 0, 0.25);
+    cursor: auto;
+  }
+
+  /* @mentions */
+  .message-content .mention {
+    background: rgba(124, 106, 247, 0.18);
+    color: #c7bcff;
+    border-radius: 3px;
+    padding: 0 2px;
+    font-weight: 500;
+  }
+
+  /* Lightweight code token colors */
+  .message-content pre .tok-str { color: #a8d08d; }
+  .message-content pre .tok-com { color: #6b7280; font-style: italic; }
+  .message-content pre .tok-num { color: #f0a868; }
+  .message-content pre .tok-kw  { color: #7c9cf7; font-weight: 600; }
+  .message-content pre .code-lang {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
 }

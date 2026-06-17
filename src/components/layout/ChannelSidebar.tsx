@@ -17,7 +17,7 @@ import { ServerNotificationSettingsModal } from "@/components/modals/ServerNotif
 import { ServerPrivacySettingsModal } from "@/components/modals/ServerPrivacySettingsModal";
 import { ServerSettingsModal } from "@/components/settings/ServerSettingsModal";
 import { formatShortDate, formatTime } from "@/lib/dateTime";
-import type { Channel, Server, MemberRole, ServerEvent, ServerUserSettings } from "@/types";
+import type { Channel, ChannelCategory, Server, MemberRole, ServerEvent, ServerUserSettings, UnreadMap } from "@/types";
 
 interface Props {
   server: Server;
@@ -47,9 +47,54 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
   const [events, setEvents] = useState<ServerEvent[]>(initialEvents);
   const [selectedEvent, setSelectedEvent] = useState<ServerEvent | null>(null);
   const [eventAlertsEnabled, setEventAlertsEnabled] = useState(true);
+  const [categories, setCategories] = useState<ChannelCategory[]>([]);
+  const [unread, setUnread] = useState<UnreadMap>({});
 
   const canManage = ["OWNER", "ADMIN"].includes(currentUserRole);
   const activeChannelId = pathname.match(/\/servers\/[^/]+\/([^/]+)/)?.[1];
+
+  // Load categories + unread state for this server.
+  useEffect(() => {
+    fetch(`/api/servers/${server.id}/categories`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setCategories(d.categories ?? []))
+      .catch(() => {});
+    fetch(`/api/servers/${server.id}/unread`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setUnread(d.unread ?? {}))
+      .catch(() => {});
+  }, [server.id]);
+
+  // Clear the active channel's badge locally when viewing it.
+  useEffect(() => {
+    if (!activeChannelId) return;
+    setUnread((prev) => (prev[activeChannelId] ? { ...prev, [activeChannelId]: { unread: false, mentions: 0 } } : prev));
+  }, [activeChannelId]);
+
+  // Live unread/mention updates from the server room.
+  useEffect(() => {
+    if (!socket) return;
+    const onActivity = ({
+      channelId,
+      mentionedUserIds,
+      mentionsEveryone,
+      authorId,
+    }: {
+      channelId: string;
+      mentionedUserIds: string[];
+      mentionsEveryone: boolean;
+      authorId: string;
+    }) => {
+      if (channelId === activeChannelId || authorId === currentUserId) return;
+      const mentionsMe = mentionsEveryone || mentionedUserIds.includes(currentUserId);
+      setUnread((prev) => {
+        const cur = prev[channelId] ?? { unread: false, mentions: 0 };
+        return { ...prev, [channelId]: { unread: true, mentions: cur.mentions + (mentionsMe ? 1 : 0) } };
+      });
+    };
+    socket.on("channel:activity", onActivity);
+    return () => { socket.off("channel:activity", onActivity); };
+  }, [socket, activeChannelId, currentUserId]);
 
   useEffect(() => {
     if (!socket) return;
@@ -160,19 +205,30 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
     setSelectedEvent(nextEvent);
   }
 
-  const textChannels = channels.filter((c) => (c.type ?? "TEXT") !== "VOICE");
-  const voiceChannels = channels.filter((c) => c.type === "VOICE");
+  const textChannels = channels.filter((c) => (c.type ?? "TEXT") !== "VOICE" && !c.categoryId);
+  const voiceChannels = channels.filter((c) => c.type === "VOICE" && !c.categoryId);
+  const orderedCategories = [...categories].sort((a, b) => a.position - b.position);
+
+  function channelIcon(channel: Channel) {
+    if (channel.type === "VOICE") return "🔊";
+    if (channel.type === "ANNOUNCEMENT") return "📢";
+    if (channel.type === "FORUM") return "🗂";
+    return "#";
+  }
 
   function renderChannelRow(channel: Channel) {
     const isActive = activeChannelId === channel.id;
     const isEditing = editingChannel === channel.id;
     const isVoice = channel.type === "VOICE";
     const vp = isVoice ? voiceRooms[channel.id] ?? [] : [];
+    const u = unread[channel.id];
+    const isUnread = Boolean(u?.unread) && !isActive;
+    const mentions = u?.mentions ?? 0;
 
     return (
       <div key={channel.id}>
         <div
-          className={`group flex items-center mx-2 rounded px-2 h-8 cursor-pointer transition-colors ${
+          className={`group relative flex items-center mx-2 rounded px-2 h-8 cursor-pointer transition-colors ${
             isActive ? "bg-dc-active text-dc-text" : "text-dc-muted hover:text-dc-text hover:bg-dc-hover"
           }`}
         >
@@ -190,10 +246,16 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
             />
           ) : (
             <Link href={`/servers/${server.id}/${channel.id}`} className="flex items-center gap-1.5 flex-1 min-w-0">
-              <span className="text-dc-muted text-base leading-none">{isVoice ? "🔊" : "#"}</span>
-              <span className="text-sm truncate">{channel.name}</span>
+              {isUnread && <span className="absolute left-0 h-2 w-1 rounded-r bg-dc-text" />}
+              <span className="text-dc-muted text-base leading-none">{channelIcon(channel)}</span>
+              <span className={`text-sm truncate ${isUnread ? "text-dc-text font-semibold" : ""}`}>{channel.name}</span>
               {isVoice && vp.length > 0 && (
                 <span className="ml-auto text-[10px] text-dc-faint">{vp.length}</span>
+              )}
+              {mentions > 0 && (
+                <span className="ml-auto rounded-full bg-dc-danger px-1.5 text-[10px] font-bold leading-4 text-white">
+                  {mentions}
+                </span>
               )}
             </Link>
           )}
@@ -398,6 +460,21 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
           )}
 
           {voiceChannels.map(renderChannelRow)}
+
+          {orderedCategories.map((cat) => {
+            const inCat = channels
+              .filter((c) => c.categoryId === cat.id)
+              .sort((a, b) => a.position - b.position);
+            if (inCat.length === 0) return null;
+            return (
+              <div key={cat.id} className="mt-4">
+                <div className="px-2 mb-1">
+                  <span className="text-xs font-semibold text-dc-muted uppercase tracking-wide px-2">{cat.name}</span>
+                </div>
+                {inCat.map(renderChannelRow)}
+              </div>
+            );
+          })}
         </div>
 
         {/* User bar */}

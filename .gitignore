@@ -43,3 +43,7 @@ Thumbs.db
 
 # Desktop agent local config (contains your RPC token)
 agent/config.json
+
+# User uploads (served from /public/uploads at runtime)
+public/uploads/*
+!public/uploads/.gitkeep

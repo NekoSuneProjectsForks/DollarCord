@@ -114,18 +114,45 @@ export interface Invite {
   createdAt: Date | string;
 }
 
-export type ChannelType = "TEXT" | "VOICE";
+export type ChannelType = "TEXT" | "VOICE" | "ANNOUNCEMENT" | "FORUM";
 
 export interface Channel {
   id: string;
   serverId: string;
+  categoryId?: string | null;
   name: string;
   description: string | null;
   type?: string;
+  slowmodeSeconds?: number;
   position: number;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
+
+export interface ChannelCategory {
+  id: string;
+  serverId: string;
+  name: string;
+  position: number;
+}
+
+export interface Attachment {
+  id: string;
+  messageId?: string;
+  url: string;
+  name: string;
+  contentType: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface ChannelUnread {
+  unread: boolean;
+  mentions: number;
+}
+
+export type UnreadMap = Record<string, ChannelUnread>;
 
 export interface ServerEventParticipant {
   id: string;
@@ -173,6 +200,7 @@ export interface Message {
   content: string;
   edited: boolean;
   deleted: boolean;
+  mentionsEveryone?: boolean;
   replyToId: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -180,6 +208,8 @@ export interface Message {
   bot?: Bot | null;
   reactions: Reaction[];
   replyTo?: Message | null;
+  attachments?: Attachment[];
+  mentions?: { userId: string }[];
 }
 
 export interface DirectMessage {

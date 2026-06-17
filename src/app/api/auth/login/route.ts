@@ -3,9 +3,19 @@ import { compareSync } from "bcryptjs";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
+import { clientIp, rateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Brute-force guard: 10 attempts / 5 min per IP.
+    const limit = rateLimit(`login:${clientIp(req)}`, 10, 5 * 60 * 1000);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: `Too many attempts. Try again in ${limit.retryAfter}s.` },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {

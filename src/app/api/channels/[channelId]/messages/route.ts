@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserFromReq } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendMessageSchema } from "@/lib/validations";
+import { MESSAGE_INCLUDE, parseMentions } from "@/lib/messages";
 import { getIO } from "@/server/socketServer";
 
 interface Params { params: { channelId: string } }
@@ -31,12 +32,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const messages = await prisma.message.findMany({
     where,
-    include: {
-      user: true,
-      bot: true,
-      reactions: { include: { user: true } },
-      replyTo: { include: { user: true, bot: true } },
-    },
+    include: MESSAGE_INCLUDE,
     orderBy: { createdAt: "desc" },
     take: limit + 1,
   });
@@ -70,6 +66,26 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
+    // Slowmode: managers are exempt; everyone else must wait between messages.
+    const isManager = ["OWNER", "ADMIN"].includes(member.role);
+    if (channel.slowmodeSeconds > 0 && !isManager) {
+      const last = await prisma.message.findFirst({
+        where: { channelId: params.channelId, userId: user.id, deleted: false },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+      if (last) {
+        const elapsed = (Date.now() - last.createdAt.getTime()) / 1000;
+        const remaining = Math.ceil(channel.slowmodeSeconds - elapsed);
+        if (remaining > 0) {
+          return NextResponse.json(
+            { error: `Slowmode is on. Wait ${remaining}s before sending again.` },
+            { status: 429 }
+          );
+        }
+      }
+    }
+
     if (parsed.data.replyToId) {
       const replyTo = await prisma.message.findFirst({
         where: {
@@ -84,24 +100,46 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
+    const { userIds: mentionedUserIds, mentionsEveryone } = await parseMentions(
+      parsed.data.content,
+      channel.serverId
+    );
+    const attachments = parsed.data.attachments ?? [];
+
     const message = await prisma.message.create({
       data: {
         channelId: params.channelId,
         userId: user.id,
         content: parsed.data.content,
         replyToId: parsed.data.replyToId ?? null,
+        mentionsEveryone,
+        mentions: { create: mentionedUserIds.map((userId) => ({ userId })) },
+        attachments: {
+          create: attachments.map((a) => ({
+            url: a.url,
+            name: a.name,
+            contentType: a.contentType,
+            size: a.size,
+            width: a.width ?? null,
+            height: a.height ?? null,
+          })),
+        },
       },
-      include: {
-        user: true,
-        bot: true,
-        reactions: { include: { user: true } },
-        replyTo: { include: { user: true, bot: true } },
-      },
+      include: MESSAGE_INCLUDE,
     });
 
-    // Broadcast to everyone in the channel room
+    // Broadcast to everyone in the channel room + the server room (for sidebar
+    // unread/mention badges in channels the user isn't currently viewing).
     try {
-      getIO().to(`channel:${params.channelId}`).emit("channel:message", message);
+      const io = getIO();
+      io.to(`channel:${params.channelId}`).emit("channel:message", message);
+      io.to(`server:${channel.serverId}`).emit("channel:activity", {
+        channelId: params.channelId,
+        serverId: channel.serverId,
+        mentionedUserIds,
+        mentionsEveryone,
+        authorId: user.id,
+      });
     } catch {}
 
     return NextResponse.json({ message }, { status: 201 });
