@@ -24,6 +24,7 @@ export interface Server {
   description: string | null;
   iconUrl: string | null;
   ownerId: string;
+  liveAnnounceChannelId?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -216,7 +217,7 @@ export type ActivityType = "PLAYING" | "STREAMING" | "LISTENING" | "WATCHING" | 
 
 export interface Activity {
   id: string;
-  source: string; // "manual" | "rpc" | "twitch"
+  source: string; // "manual" | "rpc" | "twitch" | "kick"
   type: ActivityType;
   name: string;
   details: string | null;
@@ -225,6 +226,9 @@ export interface Activity {
   largeImage: string | null;
   smallImage: string | null;
   startedAt: string | null;
+  joinUrl?: string | null;
+  partyCurrent?: number | null;
+  partyMax?: number | null;
 }
 
 export interface UserPresence {

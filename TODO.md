@@ -58,10 +58,12 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] WebRTC P2P mesh audio (Socket.IO signaling: offer/answer/ICE)
 - [x] Voice controls: mute mic, deafen, leave, per-user speaking indicator (VAD)
 - [x] STUN config + optional TURN via `NEXT_PUBLIC_TURN_*` env
-- [ ] Push-to-talk toggle (VAD is implemented; PTT mode pending) 🟡
-- [ ] Screen share / video (P2P) 🟡
-- [ ] Voice channel text chat (Discord-style) 🟢
-- [ ] Server-mute / server-deafen by moderators 🟡
+- [x] Push-to-talk toggle (Voice/PTT switch; hold Space)
+- [x] Screen share (P2P video via perfect-negotiation renegotiation)
+- [x] Voice channel text chat (Discord-style attached chat panel)
+- [x] Server-mute / server-deafen by moderators (role-checked relay)
+- [ ] Webcam video (currently screen-share only) 🟡
+- [ ] Per-user volume sliders + noise-suppression controls 🟡
 
 ### 2.2 Rich Presence / activity (Discord RPC analogue) 🔴
 - [x] `Activity` presence model (type, name, details, state, timestamps, assets)
@@ -71,19 +73,23 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
       per-user RPC token, `SetActivity`/`ClearActivity` payload, auto-expiry)
 - [x] Presence/activity broadcast over Socket.IO + activity cards on profile popout
       + status colors & activity subtitle in member list
-- [ ] Auto game detection via **desktop companion agent** (separate Electron/Node app
-      that scans processes → matches a game DB → pushes to the ingest endpoint) 🟠
-- [ ] Game/application directory (icons + names for known titles) 🟡
-- [ ] "Join game" / activity invites 🟢
+- [x] Auto game detection via **desktop companion agent** (`agent/` — standalone Node
+      app that scans processes → matches a game DB → pushes to the ingest endpoint)
+- [x] Game/application directory (`agent/games.json`, ~25 starter titles, user-extendable)
+- [x] "Join game" / activity invites (joinUrl + party occupancy; Join button on cards)
+- [ ] Package the agent as a tray app / installer (Electron or pkg) 🟡
+- [ ] Auto-launch agent on boot 🟢
 
 ### 2.3 Twitch (and Kick) live detection 🔴
 - [x] Twitch Helix client (app-access-token, `streams` lookup) using existing
       `TWITCH_CLIENT_ID/SECRET`
 - [x] API route: live status for a user's `twitchChannel` (`GET /api/users/me/twitch`)
 - [x] Auto "Streaming" presence when a linked Twitch channel goes live
-- [x] Background poller that flips presence to LIVE without a client request (2-min loop)
-- [ ] Kick live detection (public API/scrape — best effort) 🟡
-- [ ] "Now live" announcement message to a configured channel 🟢
+- [x] Background poller that flips presence to LIVE without a client request (2-min loop,
+      now covers Twitch **and** Kick)
+- [x] Kick live detection (public v2 channel API — best effort)
+- [x] "Now live" announcement message to a configured channel (per-server
+      `liveAnnounceChannelId`, set in Server Settings; posted on offline→live)
 
 ### 2.4 Discord template import (expanded) 🟠
 - [x] Import text & announcement channels (pre-existing)
@@ -230,10 +236,16 @@ Shipped (all typecheck + `next build` clean):
        change-password (logged in) — all in Settings → Account.
 6. [x] Discord template import: voice channels, roles, server name + modal toggles.
 
+### Shipped in iteration 2
+- Voice: push-to-talk, screen share (P2P), attached text chat, moderator server-mute/deafen
+- Kick live detection + "now live" announcements to a configured channel
+- Desktop companion agent (`agent/`) for automatic game detection + game directory
+- Join-game / activity invites (joinUrl + party occupancy)
+
 ### Next up
 1. Threads (§2.5) — model + UI + real-time, then import (§2.4).
-2. Desktop companion agent for automatic game detection (§2.2).
-3. Email transport for password reset; rate limiting on auth (§3, §6).
-4. Per-channel/per-role permission matrix (§4) — unlocks private channels + richer import.
+2. Email transport for password reset; rate limiting on auth (§3, §6).
+3. Per-channel/per-role permission matrix (§4) — unlocks private channels + richer import.
+4. Package the desktop agent as a tray app / installer (§2.2).
 
 > Live progress is tracked in the task list; checked items above are done & building.

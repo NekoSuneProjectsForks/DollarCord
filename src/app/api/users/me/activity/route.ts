@@ -37,6 +37,9 @@ export async function PUT(req: NextRequest) {
         largeImage: d.largeImage ?? null,
         smallImage: d.smallImage ?? null,
         startedAt: d.startedAt ? new Date(d.startedAt) : new Date(),
+        joinUrl: d.joinUrl ?? null,
+        partyCurrent: d.partyCurrent ?? null,
+        partyMax: d.partyMax ?? null,
       },
       update: {
         type: d.type,
@@ -46,6 +49,9 @@ export async function PUT(req: NextRequest) {
         url: d.url ?? null,
         largeImage: d.largeImage ?? null,
         smallImage: d.smallImage ?? null,
+        joinUrl: d.joinUrl ?? null,
+        partyCurrent: d.partyCurrent ?? null,
+        partyMax: d.partyMax ?? null,
       },
     });
 

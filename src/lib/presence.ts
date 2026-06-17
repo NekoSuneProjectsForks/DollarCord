@@ -13,6 +13,9 @@ export interface ActivityDTO {
   largeImage: string | null;
   smallImage: string | null;
   startedAt: string | null;
+  joinUrl: string | null;
+  partyCurrent: number | null;
+  partyMax: number | null;
 }
 
 export function serializeActivity(a: PrismaActivity): ActivityDTO {
@@ -27,6 +30,9 @@ export function serializeActivity(a: PrismaActivity): ActivityDTO {
     largeImage: a.largeImage,
     smallImage: a.smallImage,
     startedAt: a.startedAt ? a.startedAt.toISOString() : null,
+    joinUrl: a.joinUrl,
+    partyCurrent: a.partyCurrent,
+    partyMax: a.partyMax,
   };
 }
 

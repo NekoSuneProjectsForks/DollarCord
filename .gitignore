@@ -40,3 +40,6 @@ Thumbs.db
 # Local assistant/tooling config
 .claude/settings.local.json
 .claude/
+
+# Desktop agent local config (contains your RPC token)
+agent/config.json

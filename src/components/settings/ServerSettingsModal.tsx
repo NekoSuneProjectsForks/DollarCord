@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/contexts/ToastContext";
-import type { Bot, MemberRole, Server, ServerBan, ServerMember, ServerRole } from "@/types";
+import type { Bot, Channel, MemberRole, Server, ServerBan, ServerMember, ServerRole } from "@/types";
 
 interface Props {
   open: boolean;
@@ -20,7 +20,9 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
     name: server.name,
     description: server.description ?? "",
     iconUrl: server.iconUrl ?? "",
+    liveAnnounceChannelId: server.liveAnnounceChannelId ?? "",
   });
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState("");
@@ -42,8 +44,17 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
       name: server.name,
       description: server.description ?? "",
       iconUrl: server.iconUrl ?? "",
+      liveAnnounceChannelId: server.liveAnnounceChannelId ?? "",
     });
   }, [server]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch(`/api/servers/${server.id}/channels`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setChannels(data.channels ?? []))
+      .catch(() => {});
+  }, [open, server.id]);
 
   useEffect(() => {
     if (!open || currentUserRole === "MEMBER") return;
@@ -81,6 +92,7 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
           name: form.name || undefined,
           description: form.description || null,
           iconUrl: form.iconUrl || null,
+          liveAnnounceChannelId: form.liveAnnounceChannelId || null,
         }),
       });
       const data = await res.json();
@@ -282,6 +294,24 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
             className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
             placeholder="https://example.com/icon.png"
           />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-dc-muted uppercase tracking-wide mb-1.5">
+            Live Announcement Channel
+          </label>
+          <select
+            value={form.liveAnnounceChannelId}
+            onChange={(e) => setForm((current) => ({ ...current, liveAnnounceChannelId: e.target.value }))}
+            className="w-full bg-dc-input text-dc-text px-3 py-2 rounded border border-dc-border focus:border-dc-accent focus:outline-none text-sm"
+          >
+            <option value="">Don&apos;t announce streams</option>
+            {channels.filter((c) => (c.type ?? "TEXT") !== "VOICE").map((c) => (
+              <option key={c.id} value={c.id}>#{c.name}</option>
+            ))}
+          </select>
+          <p className="text-dc-faint text-xs mt-1">
+            When a member who linked a Twitch/Kick channel goes live, a “now live” message is posted here.
+          </p>
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-dc-muted hover:text-dc-text transition-colors">Cancel</button>

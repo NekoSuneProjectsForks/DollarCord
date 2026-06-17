@@ -26,6 +26,7 @@ export function ActivitySettings({ user }: Props) {
   const [activityType, setActivityType] = useState<ActivityType>("PLAYING");
   const [activityName, setActivityName] = useState("");
   const [activityDetails, setActivityDetails] = useState("");
+  const [activityJoinUrl, setActivityJoinUrl] = useState("");
   const [activities, setActivities] = useState<Activity[]>([]);
 
   const [rpcToken, setRpcToken] = useState<string | null>(null);
@@ -58,7 +59,12 @@ export function ActivitySettings({ user }: Props) {
     const res = await fetch("/api/users/me/activity", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: activityType, name: activityName, details: activityDetails || null }),
+      body: JSON.stringify({
+        type: activityType,
+        name: activityName,
+        details: activityDetails || null,
+        joinUrl: activityJoinUrl.trim() || null,
+      }),
     });
     const data = await res.json();
     if (!res.ok) return addToast(data.error || "Failed to set activity", "error");
@@ -85,15 +91,14 @@ export function ActivitySettings({ user }: Props) {
     setTwitchInfo("Checking…");
     const res = await fetch("/api/users/me/twitch");
     const data = await res.json();
-    if (!data.configured) {
-      setTwitchInfo("Twitch isn't configured on the server (set TWITCH_CLIENT_ID/SECRET), or no channel is linked.");
+    if (!data.twitch && !data.kick) {
+      setTwitchInfo("Link a Twitch or Kick channel in your Profile first (Twitch also needs server credentials).");
       return;
     }
-    if (!data.status) {
-      setTwitchInfo("Link a Twitch channel in your profile first.");
-      return;
-    }
-    setTwitchInfo(data.status.isLive ? `Live: ${data.status.title ?? "streaming"}` : "Currently offline.");
+    const parts: string[] = [];
+    if (data.twitch) parts.push(`Twitch: ${data.twitch.isLive ? `live — ${data.twitch.title ?? "streaming"}` : "offline"}`);
+    if (data.kick) parts.push(`Kick: ${data.kick.isLive ? `live — ${data.kick.title ?? "streaming"}` : "offline"}`);
+    setTwitchInfo(parts.join(" · "));
     const r = await fetch("/api/users/me/activity");
     setActivities((await r.json()).activities ?? []);
   }
@@ -149,6 +154,10 @@ export function ActivitySettings({ user }: Props) {
           <label className={labelCls}>Details (optional)</label>
           <input value={activityDetails} onChange={(e) => setActivityDetails(e.target.value)} maxLength={128} className={inputCls} placeholder="e.g. Survival world" />
         </div>
+        <div>
+          <label className={labelCls}>Join URL (optional)</label>
+          <input value={activityJoinUrl} onChange={(e) => setActivityJoinUrl(e.target.value)} maxLength={512} className={inputCls} placeholder="https://… — others see a Join button" />
+        </div>
         <div className="flex gap-2">
           <button type="submit" className="px-5 py-2 bg-dc-accent hover:bg-dc-accent-hover text-white text-sm font-semibold rounded transition-colors">
             Set Activity
@@ -170,14 +179,16 @@ export function ActivitySettings({ user }: Props) {
         )}
       </form>
 
-      {/* Twitch */}
+      {/* Streams */}
       <div className="bg-dc-sidebar rounded-lg p-4 mb-6 space-y-3">
-        <h3 className="text-dc-text font-semibold">Twitch Live Detection</h3>
+        <h3 className="text-dc-text font-semibold">Stream Live Detection</h3>
         <p className="text-dc-muted text-sm">
-          Link your Twitch channel in the Profile tab, then check your live status. When live, a “Streaming” presence is shown automatically.
+          Link your Twitch and/or Kick channel in the Profile tab. When you go live a “Streaming” presence appears
+          automatically (a background poller also checks every couple of minutes), and servers with a live-announce
+          channel will post that you&apos;re live.
         </p>
         <button onClick={refreshTwitch} className="px-5 py-2 bg-dc-accent hover:bg-dc-accent-hover text-white text-sm font-semibold rounded transition-colors">
-          Check Twitch Status
+          Check Stream Status
         </button>
         {twitchInfo && <p className="text-dc-muted text-sm">{twitchInfo}</p>}
       </div>

@@ -107,17 +107,32 @@ export function UserProfileModal({ open, onClose, userId, serverId }: Props) {
                   {a.largeImage && (
                     <img src={a.largeImage} alt="" className="h-12 w-12 rounded object-cover shrink-0" />
                   )}
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-dc-text">
                       {a.type === "CUSTOM" ? a.name : `${ACTIVITY_VERB[a.type] ?? "Playing"} ${a.name}`}
                     </p>
                     {a.details && <p className="text-xs text-dc-muted truncate">{a.details}</p>}
                     {a.state && <p className="text-xs text-dc-faint truncate">{a.state}</p>}
-                    {a.url && a.type === "STREAMING" && (
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-xs text-dc-accent hover:underline">
-                        Watch stream
-                      </a>
-                    )}
+                    {a.partyMax ? (
+                      <p className="text-xs text-dc-faint">Party: {a.partyCurrent ?? 0} of {a.partyMax}</p>
+                    ) : null}
+                    <div className="mt-1 flex items-center gap-3">
+                      {a.url && a.type === "STREAMING" && (
+                        <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-xs text-dc-accent hover:underline">
+                          Watch stream
+                        </a>
+                      )}
+                      {a.joinUrl && a.type !== "STREAMING" && (
+                        <a
+                          href={a.joinUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded bg-dc-accent px-3 py-1 text-xs font-semibold text-white hover:bg-dc-accent-hover"
+                        >
+                          Join
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

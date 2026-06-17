@@ -55,6 +55,7 @@ export const updateServerSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
   iconUrl: z.string().url().nullable().optional(),
+  liveAnnounceChannelId: z.string().nullable().optional(),
 });
 
 export const joinServerSchema = z.object({
@@ -210,6 +211,9 @@ export const setActivitySchema = z.object({
   largeImage: z.string().trim().max(512).nullable().optional(),
   smallImage: z.string().trim().max(512).nullable().optional(),
   startedAt: z.string().datetime().nullable().optional(),
+  joinUrl: z.string().url("Invalid join URL").nullable().optional(),
+  partyCurrent: z.number().int().min(0).max(1000000).nullable().optional(),
+  partyMax: z.number().int().min(0).max(1000000).nullable().optional(),
 });
 
 // Discord-RPC-compatible ingest payload (SetActivity-shaped). We accept the
@@ -236,6 +240,16 @@ export const rpcActivitySchema = z.object({
         })
         .nullable()
         .optional(),
+      // Discord-style party occupancy: size = [current, max].
+      party: z
+        .object({
+          id: z.string().max(128).nullable().optional(),
+          size: z.array(z.number().int()).max(2).nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+      // A join target for "Join game" (web-native; Discord uses secrets.join).
+      join_url: z.string().max(512).nullable().optional(),
     })
     .nullable(),
 });

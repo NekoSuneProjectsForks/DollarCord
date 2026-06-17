@@ -26,7 +26,13 @@ export default async function ChannelPage({ params }: Props) {
   if (!member) notFound();
 
   if (channel.type === "VOICE") {
-    return <VoiceChannelView channel={channel as any} currentUser={user} />;
+    return (
+      <VoiceChannelView
+        channel={channel as any}
+        currentUser={user}
+        currentUserRole={member.role as "OWNER" | "ADMIN" | "MEMBER"}
+      />
+    );
   }
 
   const initialMessages = await prisma.message.findMany({

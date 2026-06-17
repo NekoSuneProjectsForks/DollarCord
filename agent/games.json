@@ -1,0 +1,31 @@
+{
+  "comment": "Game/application directory. Map an executable name (lowercase, as it appears in the OS process list) to a display name and optional large image. Add your own entries freely.",
+  "games": [
+    { "process": "minecraft.exe", "name": "Minecraft", "image": null },
+    { "process": "javaw.exe", "name": "Minecraft (Java)", "image": null },
+    { "process": "factorio.exe", "name": "Factorio", "image": null },
+    { "process": "terraria.exe", "name": "Terraria", "image": null },
+    { "process": "stardew valley.exe", "name": "Stardew Valley", "image": null },
+    { "process": "valorant.exe", "name": "VALORANT", "image": null },
+    { "process": "valorant-win64-shipping.exe", "name": "VALORANT", "image": null },
+    { "process": "csgo.exe", "name": "Counter-Strike", "image": null },
+    { "process": "cs2.exe", "name": "Counter-Strike 2", "image": null },
+    { "process": "dota2.exe", "name": "Dota 2", "image": null },
+    { "process": "leagueclient.exe", "name": "League of Legends", "image": null },
+    { "process": "league of legends.exe", "name": "League of Legends", "image": null },
+    { "process": "fortniteclient-win64-shipping.exe", "name": "Fortnite", "image": null },
+    { "process": "gta5.exe", "name": "Grand Theft Auto V", "image": null },
+    { "process": "rocketleague.exe", "name": "Rocket League", "image": null },
+    { "process": "overwatch.exe", "name": "Overwatch 2", "image": null },
+    { "process": "apex_legends.exe", "name": "Apex Legends", "image": null },
+    { "process": "r5apex.exe", "name": "Apex Legends", "image": null },
+    { "process": "eldenring.exe", "name": "Elden Ring", "image": null },
+    { "process": "cyberpunk2077.exe", "name": "Cyberpunk 2077", "image": null },
+    { "process": "hl2.exe", "name": "Half-Life 2", "image": null },
+    { "process": "wow.exe", "name": "World of Warcraft", "image": null },
+    { "process": "deadlock.exe", "name": "Deadlock", "image": null },
+    { "process": "vrchat.exe", "name": "VRChat", "image": null },
+    { "process": "code.exe", "name": "Visual Studio Code", "image": null },
+    { "process": "blender.exe", "name": "Blender", "image": null }
+  ]
+}

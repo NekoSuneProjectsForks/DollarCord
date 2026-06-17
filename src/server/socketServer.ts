@@ -1,7 +1,8 @@
 import { Server as SocketServer } from "socket.io";
 import type { Server as HTTPServer } from "http";
 import { validateToken } from "../lib/auth";
-import { startTwitchPoller } from "../lib/twitchPoller";
+import { startStreamPoller } from "../lib/streamPoller";
+import { prisma } from "../lib/prisma";
 
 const SESSION_COOKIE = "dollarcord_session";
 
@@ -269,6 +270,46 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
       });
     });
 
+    // Moderator server-mute / server-deafen. Verified against the actor's role
+    // in the channel's server before relaying to the target socket.
+    socket.on(
+      "voice:moderate",
+      async ({
+        channelId,
+        serverId,
+        targetSocketId,
+        mute,
+        deafen,
+      }: {
+        channelId: string;
+        serverId: string;
+        targetSocketId: string;
+        mute?: boolean;
+        deafen?: boolean;
+      }) => {
+        try {
+          const member = await prisma.serverMember.findUnique({
+            where: { serverId_userId: { serverId, userId } },
+            select: { role: true },
+          });
+          if (!member || !["OWNER", "ADMIN"].includes(member.role)) return;
+
+          const participant = voiceRooms.get(channelId)?.get(targetSocketId);
+          if (!participant) return;
+          if (typeof mute === "boolean") participant.muted = mute;
+          if (typeof deafen === "boolean") participant.deafened = deafen || participant.deafened;
+
+          io.to(targetSocketId).emit("voice:moderate", { mute, deafen });
+          io.to(`voice:${channelId}`).emit("voice:participants", {
+            channelId,
+            participants: roomParticipants(channelId),
+          });
+        } catch (err) {
+          console.error("[voice:moderate]", err);
+        }
+      }
+    );
+
     socket.on("disconnect", () => {
       // Remove from any voice rooms this socket was in.
       for (const [channelId, members] of Array.from(voiceRooms.entries())) {
@@ -289,7 +330,7 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
   });
 
   globalThis.__io = io;
-  startTwitchPoller();
+  startStreamPoller();
   return io;
 }
 

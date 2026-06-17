@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import type { VoiceParticipant } from "@/types";
 
-// WebRTC peer-to-peer mesh voice. Each participant holds one RTCPeerConnection
-// per other participant. The newcomer always initiates offers to the peers that
-// were already in the room (delivered via "voice:peers"), which avoids offer
-// glare — existing peers simply answer.
+// WebRTC peer-to-peer mesh voice with screen share. Uses the "perfect
+// negotiation" pattern so that both the initial audio connection and later
+// track changes (adding/removing a screen-share video track) renegotiate
+// cleanly without offer glare. Politeness is derived deterministically from the
+// two socket ids so exactly one peer is polite.
 
 function iceServers(): RTCIceServer[] {
   const servers: RTCIceServer[] = [
@@ -24,18 +25,39 @@ function iceServers(): RTCIceServer[] {
   return servers;
 }
 
+interface PeerState {
+  pc: RTCPeerConnection;
+  makingOffer: boolean;
+  ignoreOffer: boolean;
+  polite: boolean;
+}
+
+export type VoiceMode = "vad" | "ptt";
+
 export interface VoiceConnection {
   joined: boolean;
   connecting: boolean;
   muted: boolean;
   deafened: boolean;
+  forcedMute: boolean;
+  forcedDeafen: boolean;
+  mode: VoiceMode;
+  pttKey: string;
+  pttActive: boolean;
+  screenSharing: boolean;
   error: string | null;
   participants: VoiceParticipant[];
-  speaking: Record<string, boolean>; // socketId -> speaking
+  speaking: Record<string, boolean>;
+  localScreenStream: MediaStream | null;
+  remoteVideo: Record<string, MediaStream>;
   join: () => Promise<void>;
   leave: () => void;
   toggleMute: () => void;
   toggleDeafen: () => void;
+  setMode: (mode: VoiceMode) => void;
+  setPttKey: (key: string) => void;
+  toggleScreenShare: () => Promise<void>;
+  moderate: (targetSocketId: string, action: { mute?: boolean; deafen?: boolean }, channelServerId: string) => void;
 }
 
 export function useVoiceChannel(channelId: string): VoiceConnection {
@@ -44,107 +66,148 @@ export function useVoiceChannel(channelId: string): VoiceConnection {
   const [connecting, setConnecting] = useState(false);
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
+  const [forcedMute, setForcedMute] = useState(false);
+  const [forcedDeafen, setForcedDeafen] = useState(false);
+  const [mode, setModeState] = useState<VoiceMode>("vad");
+  const [pttKey, setPttKey] = useState("Space");
+  const [pttActive, setPttActive] = useState(false);
+  const [screenSharing, setScreenSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState<Record<string, boolean>>({});
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
+  const [remoteVideo, setRemoteVideo] = useState<Record<string, MediaStream>>({});
 
   const localStreamRef = useRef<MediaStream | null>(null);
-  const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const peersRef = useRef<Map<string, PeerState>>(new Map());
   const audioElsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const joinedRef = useRef(false);
   const mutedRef = useRef(false);
   const deafenedRef = useRef(false);
+  const modeRef = useRef<VoiceMode>("vad");
+  const pttKeyRef = useRef("Space");
+  const pttActiveRef = useRef(false);
 
   const participants = voiceRooms[channelId] ?? [];
 
-  // --- peer connection lifecycle -------------------------------------------
-  const createPeer = useCallback(
-    (peerSocketId: string): RTCPeerConnection => {
-      const existing = pcsRef.current.get(peerSocketId);
+  // Mic is live when: not muted, and (VAD mode OR PTT key held).
+  const applyMicEnabled = useCallback(() => {
+    const enabled = !mutedRef.current && (modeRef.current === "vad" || pttActiveRef.current);
+    localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = enabled));
+  }, []);
+
+  const setMode = useCallback((m: VoiceMode) => {
+    modeRef.current = m;
+    setModeState(m);
+    applyMicEnabled();
+  }, [applyMicEnabled]);
+
+  // --- peer connection lifecycle (perfect negotiation) ----------------------
+  const getPeer = useCallback(
+    (peerSocketId: string): PeerState => {
+      const existing = peersRef.current.get(peerSocketId);
       if (existing) return existing;
 
       const pc = new RTCPeerConnection({ iceServers: iceServers() });
-      pcsRef.current.set(peerSocketId, pc);
+      const mySocketId = socket?.id ?? "";
+      const state: PeerState = { pc, makingOffer: false, ignoreOffer: false, polite: mySocketId > peerSocketId };
+      peersRef.current.set(peerSocketId, state);
 
-      localStreamRef.current?.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current!);
-      });
+      localStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current!));
+      screenStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, screenStreamRef.current!));
+
+      pc.onnegotiationneeded = async () => {
+        try {
+          state.makingOffer = true;
+          await pc.setLocalDescription(await pc.createOffer());
+          socket?.emit("voice:signal", { to: peerSocketId, data: { description: pc.localDescription } });
+        } catch (err) {
+          console.error("[voice] negotiation failed", err);
+        } finally {
+          state.makingOffer = false;
+        }
+      };
 
       pc.onicecandidate = (e) => {
-        if (e.candidate) {
-          socket?.emit("voice:signal", { to: peerSocketId, data: { candidate: e.candidate } });
-        }
+        if (e.candidate) socket?.emit("voice:signal", { to: peerSocketId, data: { candidate: e.candidate } });
       };
 
       pc.ontrack = (e) => {
-        let el = audioElsRef.current.get(peerSocketId);
-        if (!el) {
-          el = new Audio();
-          el.autoplay = true;
-          (el as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
-          audioElsRef.current.set(peerSocketId, el);
+        const [stream] = e.streams;
+        if (e.track.kind === "audio") {
+          let el = audioElsRef.current.get(peerSocketId);
+          if (!el) {
+            el = new Audio();
+            el.autoplay = true;
+            (el as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+            audioElsRef.current.set(peerSocketId, el);
+          }
+          el.srcObject = stream;
+          el.muted = deafenedRef.current;
+          el.play().catch(() => {});
+        } else if (e.track.kind === "video") {
+          setRemoteVideo((prev) => ({ ...prev, [peerSocketId]: stream }));
+          e.track.onended = () => setRemoteVideo((prev) => {
+            const next = { ...prev };
+            delete next[peerSocketId];
+            return next;
+          });
         }
-        el.srcObject = e.streams[0];
-        el.muted = deafenedRef.current;
-        el.play().catch(() => {});
       };
 
-      pc.onconnectionstatechange = () => {
-        if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
-          // Let the explicit peer:left / re-join paths handle cleanup.
-        }
-      };
-
-      return pc;
+      return state;
     },
     [socket]
   );
 
   const closePeer = useCallback((peerSocketId: string) => {
-    pcsRef.current.get(peerSocketId)?.close();
-    pcsRef.current.delete(peerSocketId);
+    peersRef.current.get(peerSocketId)?.pc.close();
+    peersRef.current.delete(peerSocketId);
     const el = audioElsRef.current.get(peerSocketId);
     if (el) {
       el.srcObject = null;
       audioElsRef.current.delete(peerSocketId);
     }
-    setSpeaking((prev) => {
-      const next = { ...prev };
-      delete next[peerSocketId];
-      return next;
-    });
+    setSpeaking((prev) => { const n = { ...prev }; delete n[peerSocketId]; return n; });
+    setRemoteVideo((prev) => { const n = { ...prev }; delete n[peerSocketId]; return n; });
   }, []);
 
-  // --- signaling listeners --------------------------------------------------
+  // --- signaling + control listeners ----------------------------------------
   useEffect(() => {
     if (!socket) return;
 
-    const onPeers = async ({ channelId: ch, peers }: { channelId: string; peers: VoiceParticipant[] }) => {
+    const onPeers = ({ channelId: ch, peers }: { channelId: string; peers: VoiceParticipant[] }) => {
       if (ch !== channelId || !joinedRef.current) return;
-      // We are the newcomer: initiate an offer to each existing peer.
-      for (const peer of peers) {
-        const pc = createPeer(peer.socketId);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit("voice:signal", { to: peer.socketId, data: { sdp: pc.localDescription } });
-      }
+      // Create a peer connection to each existing participant. Adding our local
+      // tracks fires onnegotiationneeded, which sends the initial offer.
+      for (const peer of peers) getPeer(peer.socketId);
     };
 
     const onSignal = async ({ from, data }: { from: string; data: any }) => {
       if (!joinedRef.current) return;
-      const pc = createPeer(from);
-      if (data.sdp) {
-        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        if (data.sdp.type === "offer") {
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          socket.emit("voice:signal", { to: from, data: { sdp: pc.localDescription } });
+      const state = getPeer(from);
+      const { pc } = state;
+      try {
+        if (data.description) {
+          const offerCollision =
+            data.description.type === "offer" && (state.makingOffer || pc.signalingState !== "stable");
+          state.ignoreOffer = !state.polite && offerCollision;
+          if (state.ignoreOffer) return;
+
+          await pc.setRemoteDescription(data.description);
+          if (data.description.type === "offer") {
+            await pc.setLocalDescription(await pc.createAnswer());
+            socket.emit("voice:signal", { to: from, data: { description: pc.localDescription } });
+          }
+        } else if (data.candidate) {
+          try {
+            await pc.addIceCandidate(data.candidate);
+          } catch (err) {
+            if (!state.ignoreOffer) throw err;
+          }
         }
-      } else if (data.candidate) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch {
-          /* candidate may arrive before remote description; ignore */
-        }
+      } catch (err) {
+        console.error("[voice] signal handling failed", err);
       }
     };
 
@@ -158,20 +221,42 @@ export function useVoiceChannel(channelId: string): VoiceConnection {
       setSpeaking((prev) => ({ ...prev, [socketId]: spk }));
     };
 
+    const onModerate = ({ mute, deafen }: { mute?: boolean; deafen?: boolean }) => {
+      if (typeof mute === "boolean") {
+        setForcedMute(mute);
+        if (mute) { mutedRef.current = true; setMuted(true); }
+        applyMicEnabled();
+      }
+      if (typeof deafen === "boolean") {
+        setForcedDeafen(deafen);
+        if (deafen) {
+          deafenedRef.current = true;
+          setDeafened(true);
+          audioElsRef.current.forEach((el) => (el.muted = true));
+          mutedRef.current = true;
+          setMuted(true);
+          applyMicEnabled();
+        }
+      }
+    };
+
     socket.on("voice:peers", onPeers);
     socket.on("voice:signal", onSignal);
     socket.on("voice:peer:left", onPeerLeft);
     socket.on("voice:speaking", onSpeaking);
+    socket.on("voice:moderate", onModerate);
 
     return () => {
       socket.off("voice:peers", onPeers);
       socket.off("voice:signal", onSignal);
       socket.off("voice:peer:left", onPeerLeft);
       socket.off("voice:speaking", onSpeaking);
+      socket.off("voice:moderate", onModerate);
     };
-  }, [socket, channelId, createPeer, closePeer]);
+  }, [socket, channelId, getPeer, closePeer, applyMicEnabled]);
 
-  // --- local speaking (voice-activity) detection ----------------------------
+  // --- voice-activity detection ---------------------------------------------
+  const stopVadRef = useRef<(() => void) | null>(null);
   const startVad = useCallback(
     (stream: MediaStream) => {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -183,13 +268,13 @@ export function useVoiceChannel(channelId: string): VoiceConnection {
       const data = new Uint8Array(analyser.frequencyBinCount);
       let lastSpeaking = false;
       let raf = 0;
-
       const tick = () => {
         analyser.getByteFrequencyData(data);
         let sum = 0;
         for (let i = 0; i < data.length; i++) sum += data[i];
         const avg = sum / data.length;
-        const isSpeaking = !mutedRef.current && avg > 12;
+        const micLive = !mutedRef.current && (modeRef.current === "vad" || pttActiveRef.current);
+        const isSpeaking = micLive && avg > 12;
         if (isSpeaking !== lastSpeaking) {
           lastSpeaking = isSpeaking;
           socket?.emit("voice:speaking", { channelId, speaking: isSpeaking });
@@ -197,15 +282,38 @@ export function useVoiceChannel(channelId: string): VoiceConnection {
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
-
-      return () => {
-        cancelAnimationFrame(raf);
-        ctx.close().catch(() => {});
-      };
+      return () => { cancelAnimationFrame(raf); ctx.close().catch(() => {}); };
     },
     [socket, channelId]
   );
-  const stopVadRef = useRef<(() => void) | null>(null);
+
+  // --- push-to-talk key handling --------------------------------------------
+  useEffect(() => {
+    const matches = (e: KeyboardEvent) => e.code === pttKeyRef.current || e.key === pttKeyRef.current;
+    const down = (e: KeyboardEvent) => {
+      if (!joinedRef.current || modeRef.current !== "ptt" || !matches(e)) return;
+      if (pttActiveRef.current) return;
+      // Don't hijack typing in inputs.
+      const target = e.target as HTMLElement;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      e.preventDefault();
+      pttActiveRef.current = true;
+      setPttActive(true);
+      applyMicEnabled();
+    };
+    const up = (e: KeyboardEvent) => {
+      if (modeRef.current !== "ptt" || !matches(e)) return;
+      pttActiveRef.current = false;
+      setPttActive(false);
+      applyMicEnabled();
+      socket?.emit("voice:speaking", { channelId, speaking: false });
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
+  }, [socket, channelId, applyMicEnabled]);
+
+  useEffect(() => { pttKeyRef.current = pttKey; }, [pttKey]);
 
   // --- public actions -------------------------------------------------------
   const join = useCallback(async () => {
@@ -220,6 +328,7 @@ export function useVoiceChannel(channelId: string): VoiceConnection {
       localStreamRef.current = stream;
       joinedRef.current = true;
       setJoined(true);
+      applyMicEnabled();
       stopVadRef.current = startVad(stream);
       socket.emit("voice:join", { channelId, muted: mutedRef.current, deafened: deafenedRef.current });
     } catch (err) {
@@ -228,66 +337,94 @@ export function useVoiceChannel(channelId: string): VoiceConnection {
     } finally {
       setConnecting(false);
     }
-  }, [socket, connecting, channelId, startVad]);
+  }, [socket, connecting, channelId, startVad, applyMicEnabled]);
 
   const leave = useCallback(() => {
     if (!joinedRef.current) return;
     socket?.emit("voice:leave", { channelId });
-    pcsRef.current.forEach((pc) => pc.close());
-    pcsRef.current.clear();
+    peersRef.current.forEach((s) => s.pc.close());
+    peersRef.current.clear();
     audioElsRef.current.forEach((el) => (el.srcObject = null));
     audioElsRef.current.clear();
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current = null;
     stopVadRef.current?.();
     stopVadRef.current = null;
     joinedRef.current = false;
     setJoined(false);
+    setScreenSharing(false);
+    setLocalScreenStream(null);
     setSpeaking({});
+    setRemoteVideo({});
   }, [socket, channelId]);
 
   const toggleMute = useCallback(() => {
+    if (forcedMute) return; // server-muted; cannot self-unmute
     const next = !mutedRef.current;
     mutedRef.current = next;
     setMuted(next);
-    localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = !next));
+    applyMicEnabled();
     socket?.emit("voice:state", { channelId, muted: next, deafened: deafenedRef.current });
     if (next) socket?.emit("voice:speaking", { channelId, speaking: false });
-  }, [socket, channelId]);
+  }, [socket, channelId, forcedMute, applyMicEnabled]);
 
   const toggleDeafen = useCallback(() => {
+    if (forcedDeafen) return;
     const next = !deafenedRef.current;
     deafenedRef.current = next;
     setDeafened(next);
     audioElsRef.current.forEach((el) => (el.muted = next));
-    // Deafening implies muting yourself too (Discord behavior).
     if (next && !mutedRef.current) {
       mutedRef.current = true;
       setMuted(true);
-      localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
+      applyMicEnabled();
     }
     socket?.emit("voice:state", { channelId, muted: mutedRef.current, deafened: next });
-  }, [socket, channelId]);
+  }, [socket, channelId, forcedDeafen, applyMicEnabled]);
 
-  // Clean up on unmount / channel change.
-  useEffect(() => {
-    return () => {
-      if (joinedRef.current) leave();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId]);
+  const toggleScreenShare = useCallback(async () => {
+    if (!joinedRef.current) return;
+    if (screenStreamRef.current) {
+      // Stop sharing: remove video senders and renegotiate.
+      const tracks = screenStreamRef.current.getTracks();
+      peersRef.current.forEach(({ pc }) => {
+        pc.getSenders()
+          .filter((s) => s.track && tracks.includes(s.track))
+          .forEach((s) => pc.removeTrack(s));
+      });
+      tracks.forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setScreenSharing(false);
+      setLocalScreenStream(null);
+      return;
+    }
+    try {
+      const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      screenStreamRef.current = display;
+      setLocalScreenStream(display);
+      setScreenSharing(true);
+      const videoTrack = display.getVideoTracks()[0];
+      videoTrack.onended = () => { void toggleScreenShare(); }; // stop via browser UI
+      peersRef.current.forEach(({ pc }) => pc.addTrack(videoTrack, display));
+    } catch (err) {
+      console.error("[voice] screen share failed", err);
+    }
+  }, []);
+
+  const moderate = useCallback(
+    (targetSocketId: string, action: { mute?: boolean; deafen?: boolean }, channelServerId: string) => {
+      socket?.emit("voice:moderate", { channelId, serverId: channelServerId, targetSocketId, ...action });
+    },
+    [socket, channelId]
+  );
+
+  useEffect(() => () => { if (joinedRef.current) leave(); }, [channelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
-    joined,
-    connecting,
-    muted,
-    deafened,
-    error,
-    participants,
-    speaking,
-    join,
-    leave,
-    toggleMute,
-    toggleDeafen,
+    joined, connecting, muted, deafened, forcedMute, forcedDeafen, mode, pttKey, pttActive,
+    screenSharing, error, participants, speaking, localScreenStream, remoteVideo,
+    join, leave, toggleMute, toggleDeafen, setMode, setPttKey, toggleScreenShare, moderate,
   };
 }

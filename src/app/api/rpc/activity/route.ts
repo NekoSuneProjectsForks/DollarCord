@@ -60,6 +60,11 @@ export async function POST(req: NextRequest) {
       ? new Date(typeof startRaw === "number" ? (startRaw < 1e12 ? startRaw * 1000 : startRaw) : startRaw)
       : new Date();
 
+  const partySize = activity.party?.size ?? null;
+  const partyCurrent = partySize && partySize.length > 0 ? partySize[0] : null;
+  const partyMax = partySize && partySize.length > 1 ? partySize[1] : null;
+  const joinUrl = activity.join_url ?? activity.url ?? null;
+
   // RPC presence auto-expires if the client stops heartbeating.
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
@@ -77,6 +82,10 @@ export async function POST(req: NextRequest) {
       smallImage: activity.assets?.small_image ?? null,
       startedAt,
       expiresAt,
+      joinUrl,
+      partyId: activity.party?.id ?? null,
+      partyCurrent,
+      partyMax,
     },
     update: {
       type,
@@ -87,6 +96,10 @@ export async function POST(req: NextRequest) {
       largeImage: activity.assets?.large_image ?? null,
       smallImage: activity.assets?.small_image ?? null,
       expiresAt,
+      joinUrl,
+      partyId: activity.party?.id ?? null,
+      partyCurrent,
+      partyMax,
     },
   });
 

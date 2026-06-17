@@ -55,13 +55,14 @@ model Session {
 }
 
 model Server {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  iconUrl     String?
-  ownerId     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  name                  String
+  description           String?
+  iconUrl               String?
+  ownerId               String
+  liveAnnounceChannelId String?  // channel to post "now live" announcements
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   owner        User                 @relation("ServerOwner", fields: [ownerId], references: [id])
   members      ServerMember[]
@@ -337,6 +338,11 @@ model Activity {
   smallImage String?
   startedAt  DateTime?
   expiresAt  DateTime?
+  // "Join game" support: a join target + optional party occupancy.
+  joinUrl      String?
+  partyId      String?
+  partyCurrent Int?
+  partyMax     Int?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
