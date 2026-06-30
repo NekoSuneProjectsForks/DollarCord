@@ -66,6 +66,8 @@ model Server {
   ownerId               String
   liveAnnounceChannelId String?  // channel to post "now live" announcements
   isPublic              Boolean  @default(false) // listed in server discovery
+  plan                  String   @default("FREE") // FREE | GOLD (self-host overrides to SELF_HOSTED)
+  planRenewsAt          DateTime?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserFromReq } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { joinServerSchema } from "@/lib/validations";
+import { resolvePlan, withinLimit } from "@/lib/plans";
 import { getIO } from "@/server/socketServer";
 
 export async function POST(req: NextRequest) {
@@ -53,6 +54,13 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       return NextResponse.json({ server: invite.server, alreadyMember: true });
+    }
+
+    // Plan limit: member cap (self-host = unlimited).
+    const plan = resolvePlan(invite.server.plan);
+    const memberCount = await prisma.serverMember.count({ where: { serverId: invite.serverId } });
+    if (!withinLimit(memberCount, plan.maxMembers)) {
+      return NextResponse.json({ error: "This server is full (member limit reached)." }, { status: 403 });
     }
 
     // Join server

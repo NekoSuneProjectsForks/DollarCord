@@ -10,6 +10,7 @@ interface Props {
   channel: Channel;
   currentUser: User;
   currentUserRole: MemberRole;
+  voiceBitrateKbps?: number;
 }
 
 function MicIcon({ muted }: { muted: boolean }) {
@@ -57,8 +58,8 @@ function VideoTile({ stream, label, mirror }: { stream: MediaStream; label: stri
   );
 }
 
-export function VoiceChannelView({ channel, currentUser, currentUserRole }: Props) {
-  const v = useVoiceChannel(channel.id);
+export function VoiceChannelView({ channel, currentUser, currentUserRole, voiceBitrateKbps }: Props) {
+  const v = useVoiceChannel(channel.id, { audioBitrateKbps: voiceBitrateKbps });
   const [showChat, setShowChat] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);

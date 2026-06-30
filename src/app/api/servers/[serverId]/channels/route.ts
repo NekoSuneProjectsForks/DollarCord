@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserFromReq } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createChannelSchema } from "@/lib/validations";
+import { resolvePlan, withinLimit } from "@/lib/plans";
 import { getIO } from "@/server/socketServer";
 
 interface Params { params: { serverId: string } }
@@ -40,7 +41,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
     }
 
-    const count = await prisma.channel.count({ where: { serverId: params.serverId } });
+    // Plan limit: cap voice/text channel counts (self-host = unlimited).
+    const server = await prisma.server.findUnique({ where: { id: params.serverId }, select: { plan: true } });
+    const plan = resolvePlan(server?.plan);
+    const wantsVoice = (parsed.data.type ?? "TEXT") === "VOICE";
+    const existing = await prisma.channel.findMany({ where: { serverId: params.serverId }, select: { type: true } });
+    const voiceCount = existing.filter((c) => c.type === "VOICE").length;
+    const textCount = existing.length - voiceCount;
+    if (wantsVoice && !withinLimit(voiceCount, plan.maxVoiceChannels)) {
+      return NextResponse.json({ error: `Your plan (${plan.name}) allows ${plan.maxVoiceChannels} voice channels. Upgrade for more.` }, { status: 403 });
+    }
+    if (!wantsVoice && !withinLimit(textCount, plan.maxTextChannels)) {
+      return NextResponse.json({ error: `Your plan (${plan.name}) allows ${plan.maxTextChannels} text channels. Upgrade for more.` }, { status: 403 });
+    }
+
+    const count = existing.length;
     const channel = await prisma.channel.create({
       data: {
         serverId: params.serverId,

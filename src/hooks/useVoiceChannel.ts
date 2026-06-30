@@ -82,8 +82,10 @@ export interface VoiceConnection {
   moderate: (targetSocketId: string, action: { mute?: boolean; deafen?: boolean }, channelServerId: string) => void;
 }
 
-export function useVoiceChannel(roomId: string): VoiceConnection {
+export function useVoiceChannel(roomId: string, opts?: { audioBitrateKbps?: number }): VoiceConnection {
   const { socket, voiceRooms } = useSocket();
+  const audioBitrateRef = useRef<number | undefined>(opts?.audioBitrateKbps);
+  useEffect(() => { audioBitrateRef.current = opts?.audioBitrateKbps; }, [opts?.audioBitrateKbps]);
   const [joined, setJoined] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -154,6 +156,17 @@ export function useVoiceChannel(roomId: string): VoiceConnection {
       localStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current!));
       screenStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, screenStreamRef.current!));
       cameraStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, cameraStreamRef.current!));
+
+      // Cap audio bitrate to the server plan's allowance.
+      if (audioBitrateRef.current) {
+        const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+        if (sender) {
+          const params = sender.getParameters();
+          if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+          params.encodings[0].maxBitrate = audioBitrateRef.current * 1000;
+          sender.setParameters(params).catch(() => {});
+        }
+      }
 
       pc.onnegotiationneeded = async () => {
         try {

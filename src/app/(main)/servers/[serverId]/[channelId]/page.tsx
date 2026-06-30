@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { VoiceChannelView } from "@/components/voice/VoiceChannelView";
 import { getChannelPermissions, has, Permission } from "@/lib/permissions";
+import { resolvePlan } from "@/lib/plans";
 
 interface Props {
   params: { serverId: string; channelId: string };
@@ -30,11 +31,13 @@ export default async function ChannelPage({ params }: Props) {
   if (!has(channelPerms, Permission.VIEW_CHANNEL)) notFound();
 
   if (channel.type === "VOICE") {
+    const plan = resolvePlan(channel.server.plan);
     return (
       <VoiceChannelView
         channel={channel as any}
         currentUser={user}
         currentUserRole={member.role as "OWNER" | "ADMIN" | "MEMBER"}
+        voiceBitrateKbps={plan.voiceBitrateKbps}
       />
     );
   }

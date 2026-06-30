@@ -3,11 +3,16 @@ import { randomBytes } from "crypto";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getCurrentUserFromReq } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { storageDir, storageNamespace, publicUrl } from "@/lib/storage";
+import { resolvePlan } from "@/lib/plans";
 
 export const runtime = "nodejs";
 
-const MAX_SIZE = 25 * 1024 * 1024; // 25 MB
+// Hard ceiling regardless of plan: the route buffers the file in memory, so very
+// large uploads need streaming/object storage (tracked in TODO). Plans may set a
+// lower per-file limit than this.
+const HARD_MAX = 100 * 1024 * 1024; // 100 MB
 
 function safeExt(name: string): string {
   const ext = path.extname(name).toLowerCase().replace(/[^a-z0-9.]/g, "");
@@ -28,8 +33,26 @@ export async function POST(req: NextRequest) {
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "File is too large (max 25 MB)" }, { status: 413 });
+
+  // Plan-based per-file + total-storage limits (self-host = unlimited up to HARD_MAX).
+  const server = serverId
+    ? await prisma.server.findUnique({ where: { id: serverId }, select: { plan: true } })
+    : null;
+  const plan = resolvePlan(server?.plan);
+  const perFileCap = Math.min(plan.maxFileBytes ?? HARD_MAX, HARD_MAX);
+  if (file.size > perFileCap) {
+    const mb = Math.floor(perFileCap / (1024 * 1024));
+    return NextResponse.json({ error: `File is too large (max ${mb} MB on your plan)` }, { status: 413 });
+  }
+
+  if (serverId && plan.storageBytes !== null) {
+    const used = await prisma.attachment.aggregate({
+      _sum: { size: true },
+      where: { message: { channel: { serverId } } },
+    });
+    if ((used._sum.size ?? 0) + file.size > plan.storageBytes) {
+      return NextResponse.json({ error: "Server storage limit reached. Upgrade your plan for more." }, { status: 413 });
+    }
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());

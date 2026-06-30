@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/contexts/ToastContext";
 import { PERMISSION_LIST, has } from "@/lib/permissionFlags";
+import { ServerPlanSection } from "./ServerPlanSection";
 import type { Bot, Channel, MemberRole, Server, ServerBan, ServerMember, ServerRole } from "@/types";
 
 interface Props {
@@ -399,6 +400,8 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
           </button>
         </div>
       </form>
+
+      <ServerPlanSection serverId={server.id} isOwner={currentUserRole === "OWNER"} />
 
       {currentUserRole !== "MEMBER" && (
         <div className="border-t border-dc-border pt-5 mb-6 space-y-5">

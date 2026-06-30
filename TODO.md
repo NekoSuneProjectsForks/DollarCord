@@ -256,6 +256,31 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 > any number of guilds. The new piece is per-server data directories (done) so files
 > don't comingle. Hard DB isolation per tenant is the optional next step.
 
+### Server tiers (built)
+- [x] **Free / Gold ($5/mo) / Self-Hosted** plans (`src/lib/plans.ts`) with limits +
+      feature flags; `SELF_HOSTED=true` unlocks the unlimited tier for every server.
+- [x] Enforcement: channel counts, member cap, per-file + total storage, voice bitrate.
+- [x] Plan card in Server Settings (usage vs limits, features, self-hosted card with
+      early-adopter free-forever banner + optional $2/mo·$15/yr support).
+- [x] Docker self-host (`Dockerfile`, `docker-compose.yml`, `SELF_HOSTING.md`).
+- [ ] Real $5 / support checkout (Stripe) — see §9.
+
+### Cloud vs self-host architecture (GameVox-style) — seam in place
+- [x] Coordination seam `src/lib/cloud.ts` + `CLOUD_URL`/`NODE_ID` env. Model:
+      clients send **voice/video/chat/files directly to the (self-host) node**; the
+      **cloud is used only for auth federation, license, discovery** (lightweight).
+      Default is fully standalone (no phone-home).
+- [ ] Wire cloud-account federation into auth so a self-host can authenticate cloud
+      accounts (verify token → local ghost user). 🟠
+- [ ] Cloud-side: account service, node registry/discovery, license issuance. 🟠
+
+### Repository layout (branches)
+- `main` — README + pointers only.
+- `docker` — full application source + `Dockerfile` + GHCR publish workflow.
+- `selfhost` — deployment kit (compose pulling the GHCR image + docs/env).
+- `desktop` — Electron desktop client.
+- `mobile` — Expo (iOS + Android) client.
+
 ---
 
 ## 9. Self-host licensing & launch promo — PLAN (not yet built)
