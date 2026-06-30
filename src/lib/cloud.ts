@@ -1,6 +1,6 @@
 import { isSelfHosted } from "./plans";
 
-// Cloud-coordination seam (GameVox-style architecture).
+// Cloud-coordination seam (direct-to-server architecture).
 //
 //   Client ──voice/video/chat/files──▶ Your Server (self-host node)
 //   Client / Node ──auth & coordination (lightweight)──▶ Cloud

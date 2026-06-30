@@ -1,11 +1,10 @@
-// Server plan tiers (GameVox-style), enforced across the app.
+// Server plan tiers, enforced across the app.
 //
 //   FREE         — the free "Standard" tier
 //   GOLD         — $5/mo paid tier
 //   SELF_HOSTED  — applied to EVERY server when the node runs with SELF_HOSTED=true.
-//                  Unlimited everything + all features, and then some (better than
-//                  GameVox's self-hosted): higher bitrate, 4K share, unlimited file
-//                  size, API access, custom branding.
+//                  Unlimited everything + all features, and then some: higher
+//                  bitrate, 4K share, unlimited file size, API access, custom branding.
 //
 // A limit of `null` means unlimited.
 
@@ -18,10 +17,10 @@ export interface PlanFeatures {
   musicDjKbps: number;
   videoDj: boolean;
   gameOverlay: boolean;
-  spatialAudio: boolean; // "GameLink" analogue
+  spatialAudio: boolean; // positional / spatial voice
   serverApplications: boolean;
   serverUserProfiles: boolean;
-  // Self-hosted exclusives (better than GameVox):
+  // Self-hosted exclusives:
   customBranding: boolean;
   apiAccess: boolean;
   prioritySignaling: boolean;
@@ -107,14 +106,14 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     maxMembers: null,
     maxVoiceChannels: null,
     maxTextChannels: null,
-    voiceBitrateKbps: 384, // beyond GameVox's 256
+    voiceBitrateKbps: 384,
     storageBytes: null,
     maxFileBytes: null,
     soundboardSlots: 64,
     customEmojis: null,
     features: {
       screenShareVideo: true,
-      screenShareMax: "2160p60", // 4K — better than GameVox's 1440p
+      screenShareMax: "2160p60", // 4K
       aiVoiceIsolation: true,
       musicDjKbps: 320,
       videoDj: true,
@@ -130,7 +129,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
 };
 
 // Self-hosted early-adopter window: free forever if the node was activated before
-// this cutoff (mirrors GameVox's "free forever if created before July 1, 2026").
+// this cutoff (free forever if activated before July 1, 2026).
 export const SELF_HOST_FREE_CUTOFF = "2026-07-01T00:00:00.000Z";
 export const SELF_HOST_SUPPORT = { monthlyUsd: 2, yearlyUsd: 15 };
 

@@ -67,7 +67,7 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] **1:1 / group DM calls** (📞/📹 in DMs, ring + incoming banner, reuses the mesh)
 - [ ] Voice regions / SFU for large rooms (mesh is fine for small groups) 🟢
 
-### 2.1b GameVox-style positioning
+### 2.1b Low-latency gaming voice positioning
 - [x] Low-latency P2P voice, PTT, device selection, per-user volume, noise gate
 - [ ] Always-on overlay / global PTT outside the browser (needs desktop agent) 🟡
 - [ ] Ping/latency indicator per peer 🟢

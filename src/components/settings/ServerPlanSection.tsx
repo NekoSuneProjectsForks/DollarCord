@@ -98,7 +98,7 @@ export function ServerPlanSection({ serverId, isOwner }: Props) {
           <Stat label="Custom Emojis" value={fmt(plan.customEmojis)} />
           <Stat label="Soundboard" value={`${plan.soundboardSlots} slots`} />
           <Stat label="Applications" value={f.serverApplications ? "Enabled" : "—"} />
-          <Stat label="Spatial Audio" value={f.spatialAudio ? "GameLink" : "—"} />
+          <Stat label="Spatial Audio" value={f.spatialAudio ? "Enabled" : "—"} />
           <Stat label="DJ" value={f.videoDj ? "Video + Music" : `Music (${f.musicDjKbps}k)`} />
         </div>
 
