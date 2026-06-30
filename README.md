@@ -2,7 +2,7 @@
 
 A real-time, Discord-inspired community platform — servers, text & voice channels,
 DMs, threads, screen share, video, rich presence, roles/permissions, and more — with
-a **GameVox-style self-host model**: run your own node, your data stays yours.
+a **direct-to-server self-host model**: run your own node, your data stays yours.
 
 This repository is split across branches. **`main` is just this overview** — the code
 lives on the branches below.
@@ -27,7 +27,7 @@ docker compose up -d          # open http://localhost:3000
 The published image is `ghcr.io/nekosuneprojectsforks/dollarcord:latest` (built by the
 [GHCR workflow](../../blob/docker/.github/workflows/docker-publish.yml) on the `docker` branch).
 
-## 🧭 Architecture (GameVox-style)
+## 🧭 Architecture (direct-to-server)
 
 ```
   Client ──── voice / video / chat / files (direct) ────▶  Your Server (self-host node)
