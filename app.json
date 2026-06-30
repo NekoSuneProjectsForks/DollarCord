@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "DollarCord",
+    "slug": "dollarcord",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "dollarcord",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#1e1f22",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nekosune.dollarcord",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "DollarCord uses your microphone for voice chat and calls.",
+        "NSCameraUsageDescription": "DollarCord uses your camera for video calls."
+      }
+    },
+    "android": {
+      "package": "com.nekosune.dollarcord",
+      "permissions": ["RECORD_AUDIO", "CAMERA", "MODIFY_AUDIO_SETTINGS"]
+    }
+  }
+}
