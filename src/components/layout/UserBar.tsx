@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSocket } from "@/contexts/SocketContext";
 import type { User } from "@/types";
 
 interface Props {
@@ -9,6 +12,13 @@ interface Props {
   onLogout: () => void;
   onSettings?: () => void;
 }
+
+const STATUS_OPTIONS: { value: "ONLINE" | "IDLE" | "DND" | "INVISIBLE"; label: string; dot: string }[] = [
+  { value: "ONLINE", label: "Online", dot: "bg-dc-success" },
+  { value: "IDLE", label: "Idle", dot: "bg-dc-warning" },
+  { value: "DND", label: "Do Not Disturb", dot: "bg-dc-danger" },
+  { value: "INVISIBLE", label: "Invisible", dot: "bg-dc-faint" },
+];
 
 function SettingsIcon() {
   return (
@@ -30,9 +40,48 @@ function LogoutIcon() {
 }
 
 export function UserBar({ user, onLogout, onSettings }: Props) {
+  const { setUser } = useAuth();
+  const { socket } = useSocket();
+  const [showStatus, setShowStatus] = useState(false);
+
+  async function setStatus(status: "ONLINE" | "IDLE" | "DND" | "INVISIBLE") {
+    setShowStatus(false);
+    setUser({ ...user, status });
+    socket?.emit("presence:status", { status });
+    const res = await fetch("/api/users/me/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.user) setUser(data.user);
+    }
+  }
+
   return (
-    <div className="border-t border-dc-border bg-dc-overlay px-2 py-2 flex items-center gap-2 shrink-0">
-      <Avatar user={user} size="sm" online={user.status !== "INVISIBLE"} status={(user.status as string) || "ONLINE"} />
+    <div className="relative border-t border-dc-border bg-dc-overlay px-2 py-2 flex items-center gap-2 shrink-0">
+      {showStatus && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowStatus(false)} />
+          <div className="absolute bottom-full left-2 z-50 mb-1 w-48 rounded-lg border border-dc-border bg-dc-rail shadow-xl overflow-hidden">
+            {STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setStatus(opt.value)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-dc-text hover:bg-dc-hover"
+              >
+                <span className={`h-2.5 w-2.5 rounded-full ${opt.dot}`} />
+                {opt.label}
+                {(user.status || "ONLINE") === opt.value && <span className="ml-auto text-dc-accent">✓</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <button onClick={() => setShowStatus((s) => !s)} title="Change status" className="shrink-0">
+        <Avatar user={user} size="sm" online={user.status !== "INVISIBLE"} status={(user.status as string) || "ONLINE"} />
+      </button>
       <div className="flex-1 min-w-0">
         <p className="text-dc-text text-sm font-semibold truncate">{user.displayName}</p>
         <div className="flex items-center gap-1.5 min-w-0">
