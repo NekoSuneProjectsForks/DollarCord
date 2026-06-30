@@ -4,7 +4,7 @@ Run your own DollarCord node in one command. This branch is the **deployment kit
 it pulls the prebuilt image from GHCR (built on the [`docker`](../../tree/docker)
 branch) and runs everything on your own infrastructure.
 
-> **Architecture (GameVox-style):** all voice / video / chat / file traffic goes
+> **Architecture (direct-to-server):** all voice / video / chat / file traffic goes
 > **directly between clients and your server**. The cloud (optional, via `CLOUD_URL`)
 > is used only for lightweight **auth & coordination**. Leave `CLOUD_URL` empty for a
 > fully standalone node with its own accounts.
