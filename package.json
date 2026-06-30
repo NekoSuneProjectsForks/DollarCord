@@ -1,0 +1,23 @@
+{
+  "name": "dollarcord-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DollarCord desktop client (Electron) — connect to any DollarCord server.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.nekosune.dollarcord",
+    "productName": "DollarCord",
+    "files": ["main.js", "preload.js", "renderer/**", "package.json"],
+    "mac": { "target": "dmg" },
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage" }
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

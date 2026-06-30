@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connect — DollarCord</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+        background: #1e1f22; color: #e3e5e8;
+        font-family: -apple-system, Segoe UI, Roboto, Inter, sans-serif;
+      }
+      .card { width: 380px; background: #2b2d31; border-radius: 12px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p { color: #b5bac1; font-size: 13px; margin: 0 0 18px; }
+      label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #b5bac1; }
+      input { width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 6px; border: 1px solid #1e1f22;
+        background: #1e1f22; color: #e3e5e8; font-size: 14px; }
+      button { width: 100%; margin-top: 16px; padding: 11px; border: 0; border-radius: 6px; cursor: pointer;
+        background: #7c6af7; color: #fff; font-weight: 600; font-size: 14px; }
+      button:hover { background: #6a57e6; }
+      .err { color: #f23f43; font-size: 12px; margin-top: 10px; min-height: 14px; }
+      .hint { color: #80848e; font-size: 12px; margin-top: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>💸 Connect to a server</h1>
+      <p>Enter the URL of your DollarCord server (cloud or self-hosted).</p>
+      <label>Server URL</label>
+      <input id="url" placeholder="https://chat.example.com" value="http://localhost:3000" />
+      <button id="go">Connect</button>
+      <div class="err" id="err"></div>
+      <div class="hint">Self-hosting? See the <code>selfhost</code> branch to run your own node.</div>
+    </div>
+    <script>
+      const go = document.getElementById("go");
+      const url = document.getElementById("url");
+      const err = document.getElementById("err");
+      async function connect() {
+        err.textContent = "";
+        const res = await window.dollarcord.connect(url.value);
+        if (!res.ok) err.textContent = res.error || "Could not connect";
+      }
+      go.addEventListener("click", connect);
+      url.addEventListener("keydown", (e) => { if (e.key === "Enter") connect(); });
+    </script>
+  </body>
+</html>
