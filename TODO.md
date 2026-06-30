@@ -160,13 +160,17 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] Threads (message threads): Thread model, create from message/channel, thread
       panel, real-time replies, reuse of message rendering + composer
 - [x] "New messages" divider + jump-to-present (uses read-state)
-- [ ] Custom emoji & stickers (server-uploaded) 🟠
-- [ ] Forum channels 🟢 — type exists; needs thread-list landing UI
+- [x] **Polls** (create from composer, vote/toggle, live tallies)
+- [x] **Link unfurling / OpenGraph** generic link previews (`/api/unfurl` + card)
+- [x] Forum channels — open straight to a thread/post list landing
+- [x] Message **formatting toolbar** (bold/italic/strike/code/spoiler) in composer
+- [~] Custom emoji (server-uploaded): backend + plan limit done; inline `:name:` render
+      + composer picker still to wire 🟠
+- [ ] Stickers (server-uploaded) 🟠
 - [ ] Announcement channels + follow 🟢 — type exists; needs follow plumbing
 - [ ] Slash commands framework for bots 🟡
-- [ ] Message formatting toolbar + emoji picker (full unicode set) 🟡
+- [ ] Full unicode emoji picker (quick picker + custom shipped) 🟡
 - [ ] Read receipts (per-user seen markers) 🟠 — divider/jump shipped; seen-by pending
-- [ ] Link unfurling / OpenGraph embeds (generic) 🟡
 
 ### Structure & permissions
 - [x] Channel categories / groups (collapsible, persisted per server)
@@ -188,8 +192,8 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [ ] Per-channel/per-member overrides UI (role + everyone shipped; per-member pending) 🟡
 
 ### Social
-- [ ] Friends system (request/accept/block) 🟠
-- [ ] Block users (global) 🟠
+- [x] **Friends system** (add by username, accept/ignore, remove) — `/friends` page + rail icon
+- [x] **Block users (global)** — blocks gate DMs + friend requests both directions
 - [ ] Group DMs (3+ participants) 🟠
 - [ ] User notes, mutual servers/friends 🟢
 - [ ] Rich user profile popout (banner, accent, badges, connections) 🟡
@@ -236,8 +240,10 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [ ] Socket.IO horizontal scaling (Redis adapter) 🟡
 - [ ] Input sanitization / XSS hardening on markdown 🔴
 - [ ] API rate limiting middleware (global) 🟠
-- [ ] Health checks + graceful shutdown 🟡
-- [ ] Docker / docker-compose for full stack 🟡
+- [x] Health check endpoint (`/api/health` — DB ping + mode)
+- [x] Docker / docker-compose for full stack (Dockerfile + compose + GHCR workflow)
+- [x] PWA: web manifest + theme/viewport (installable, responsive-ready)
+- [ ] Graceful shutdown 🟡
 - [ ] Seed data + demo mode 🟢
 
 ---

@@ -1,0 +1,12 @@
+{
+  "name": "DollarCord",
+  "short_name": "DollarCord",
+  "description": "Real-time community chat — servers, voice/video, DMs, threads.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e1f22",
+  "theme_color": "#1e1f22",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

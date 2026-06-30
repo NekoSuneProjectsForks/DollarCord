@@ -3,8 +3,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { VoiceChannelView } from "@/components/voice/VoiceChannelView";
+import { ForumChannelView } from "@/components/chat/ForumChannelView";
 import { getChannelPermissions, has, Permission } from "@/lib/permissions";
 import { resolvePlan } from "@/lib/plans";
+import { MESSAGE_INCLUDE } from "@/lib/messages";
 
 interface Props {
   params: { serverId: string; channelId: string };
@@ -42,14 +44,13 @@ export default async function ChannelPage({ params }: Props) {
     );
   }
 
+  if (channel.type === "FORUM") {
+    return <ForumChannelView channel={channel as any} currentUser={user} />;
+  }
+
   const initialMessages = await prisma.message.findMany({
-    where: { channelId: params.channelId, deleted: false },
-    include: {
-      user: true,
-      bot: true,
-      reactions: { include: { user: true } },
-      replyTo: { include: { user: true, bot: true } },
-    },
+    where: { channelId: params.channelId, deleted: false, threadId: null },
+    include: MESSAGE_INCLUDE,
     orderBy: { createdAt: "desc" },
     take: 50,
   });

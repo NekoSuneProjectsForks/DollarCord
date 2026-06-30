@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { Socket } from "socket.io-client";
 import type { Attachment, Message } from "@/types";
 import { useToast } from "@/contexts/ToastContext";
+import { CreatePollModal } from "@/components/modals/CreatePollModal";
 
 interface MemberOption {
   username: string;
@@ -56,6 +57,7 @@ export function MessageInput({
   const [cooldown, setCooldown] = useState(0);
   const [members, setMembers] = useState<MemberOption[] | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [showPoll, setShowPoll] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -223,6 +225,21 @@ export function MessageInput({
     }
   }
 
+  // Wrap the current textarea selection with markdown markers (formatting toolbar).
+  function wrap(prefix: string, suffix = prefix) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? content.length;
+    const end = el.selectionEnd ?? content.length;
+    const sel = content.slice(start, end) || "text";
+    const next = content.slice(0, start) + prefix + sel + suffix + content.slice(end);
+    setContent(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + prefix.length, start + prefix.length + sel.length);
+    });
+  }
+
   function handleDrop(e: React.DragEvent) {
     if (e.dataTransfer.files.length > 0) {
       e.preventDefault();
@@ -265,6 +282,18 @@ export function MessageInput({
           ))}
         </div>
       )}
+
+      {/* Formatting toolbar */}
+      <div className="flex items-center gap-1 px-1 pb-1 text-dc-muted">
+        <button type="button" onClick={() => wrap("**")} className="px-1.5 py-0.5 rounded hover:bg-dc-hover hover:text-dc-text text-sm font-bold" title="Bold">B</button>
+        <button type="button" onClick={() => wrap("*")} className="px-1.5 py-0.5 rounded hover:bg-dc-hover hover:text-dc-text text-sm italic" title="Italic">I</button>
+        <button type="button" onClick={() => wrap("~~")} className="px-1.5 py-0.5 rounded hover:bg-dc-hover hover:text-dc-text text-sm line-through" title="Strikethrough">S</button>
+        <button type="button" onClick={() => wrap("`")} className="px-1.5 py-0.5 rounded hover:bg-dc-hover hover:text-dc-text text-xs font-mono" title="Code">{"</>"}</button>
+        <button type="button" onClick={() => wrap("||")} className="px-1.5 py-0.5 rounded hover:bg-dc-hover hover:text-dc-text text-sm" title="Spoiler">▒</button>
+        {!isDM && (
+          <button type="button" onClick={() => setShowPoll(true)} className="ml-auto px-1.5 py-0.5 rounded hover:bg-dc-hover hover:text-dc-text text-sm" title="Create a poll">📊</button>
+        )}
+      </div>
 
       <div className={`relative flex items-end gap-2 bg-dc-input rounded-lg border border-dc-border focus-within:border-dc-accent/50 transition-colors ${replyTo || staged.length > 0 ? "rounded-t-none" : ""}`}>
         {/* Mention autocomplete */}
@@ -353,6 +382,8 @@ export function MessageInput({
           </>
         )}
       </p>
+
+      {!isDM && <CreatePollModal open={showPoll} onClose={() => setShowPoll(false)} channelId={channelId} />}
     </div>
   );
 }

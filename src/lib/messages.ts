@@ -9,6 +9,7 @@ export const MESSAGE_INCLUDE = {
   replyTo: { include: { user: true, bot: true } },
   attachments: true,
   mentions: true,
+  poll: { include: { options: { orderBy: { position: "asc" } }, votes: true } },
 } satisfies Prisma.MessageInclude;
 
 const MENTION_RE = /@([a-zA-Z0-9_.-]{2,32})/g;

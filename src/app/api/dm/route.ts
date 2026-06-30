@@ -39,6 +39,17 @@ export async function POST(req: NextRequest) {
   const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!targetUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
+  // Block gating: neither party may DM if a block exists in either direction.
+  const block = await prisma.block.findFirst({
+    where: {
+      OR: [
+        { blockerId: user.id, blockedId: targetUserId },
+        { blockerId: targetUserId, blockedId: user.id },
+      ],
+    },
+  });
+  if (block) return NextResponse.json({ error: "You can't message this user" }, { status: 403 });
+
   // Check if thread already exists
   const existing = await prisma.directMessageThread.findFirst({
     where: {

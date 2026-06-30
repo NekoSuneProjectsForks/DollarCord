@@ -195,6 +195,25 @@ export interface Reaction {
   createdAt: Date | string;
 }
 
+export interface PollOption { id: string; text: string; position: number; }
+export interface PollVote { id: string; pollId: string; optionId: string; userId: string; }
+export interface Poll {
+  id: string;
+  messageId: string;
+  question: string;
+  multiple: boolean;
+  closesAt?: string | null;
+  options: PollOption[];
+  votes: PollVote[];
+}
+
+export interface ServerEmoji { id: string; serverId: string; name: string; url: string; }
+
+export interface FriendEntry {
+  id: string;
+  user: Pick<User, "id" | "username" | "displayName" | "avatarUrl">;
+}
+
 export interface Message {
   id: string;
   channelId: string;
@@ -214,6 +233,7 @@ export interface Message {
   replyTo?: Message | null;
   attachments?: Attachment[];
   mentions?: { userId: string }[];
+  poll?: Poll | null;
 }
 
 export interface DirectMessage {

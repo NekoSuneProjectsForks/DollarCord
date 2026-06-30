@@ -131,6 +131,23 @@ export function ServerRail({ user: _user, initialServers }: Props) {
             </div>
           </Link>
 
+          <Link href="/friends" className="group relative flex items-center" title="Friends">
+            <span
+              className={`absolute -left-3 w-1 rounded-r-full bg-dc-text transition-all ${
+                pathname.startsWith("/friends") ? "h-8" : "h-4 opacity-0 group-hover:opacity-100"
+              }`}
+            />
+            <div
+              className={`w-12 h-12 flex items-center justify-center transition-all duration-150 shadow-lg text-xl ${
+                pathname.startsWith("/friends")
+                  ? "rounded-2xl bg-dc-accent text-white"
+                  : "rounded-full bg-dc-sidebar group-hover:rounded-2xl group-hover:bg-dc-accent text-dc-accent group-hover:text-white"
+              }`}
+            >
+              👥
+            </div>
+          </Link>
+
           <Link href="/discover" className="group relative flex items-center" title="Discover servers">
             <span
               className={`absolute -left-3 w-1 rounded-r-full bg-dc-text transition-all ${

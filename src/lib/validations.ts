@@ -88,6 +88,21 @@ export const updateChannelSchema = z.object({
   nsfw: z.boolean().optional(),
 });
 
+export const createEmojiSchema = z.object({
+  name: z.string().trim().min(2).max(32).regex(/^[a-z0-9_]+$/, "Emoji name: lowercase letters, numbers, underscores"),
+  url: z.string().min(1).max(1024),
+});
+
+export const friendRequestSchema = z.object({
+  username: z.string().trim().min(1).max(32),
+});
+
+export const createPollSchema = z.object({
+  question: z.string().trim().min(1, "Question is required").max(300),
+  options: z.array(z.string().trim().min(1).max(100)).min(2, "At least 2 options").max(10),
+  multiple: z.boolean().optional(),
+});
+
 export const attachmentInputSchema = z.object({
   url: z.string().min(1).max(1024),
   name: z.string().min(1).max(256),

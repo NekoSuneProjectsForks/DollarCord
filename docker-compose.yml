@@ -31,6 +31,16 @@ services:
       # TWITCH_CLIENT_SECRET: ""
     volumes:
       - dollarcord-data:/data
+  coturn:
+    image: coturn/coturn
+    network_mode: host
+    command:
+      - --no-cli
+      - --lt-cred-mech
+      - --realm=example.com
+      - --user=user:password
+      - --fingerprint
+      - --external-ip=YOUR_PUBLIC_IP
 
 volumes:
   dollarcord-data:
