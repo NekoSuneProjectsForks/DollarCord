@@ -265,7 +265,7 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] Docker self-host (`Dockerfile`, `docker-compose.yml`, `SELF_HOSTING.md`).
 - [ ] Real $5 / support checkout (Stripe) — see §9.
 
-### Cloud vs self-host architecture (GameVox-style) — seam in place
+### Cloud vs self-host architecture (direct-to-server) — seam in place
 - [x] Coordination seam `src/lib/cloud.ts` + `CLOUD_URL`/`NODE_ID` env. Model:
       clients send **voice/video/chat/files directly to the (self-host) node**; the
       **cloud is used only for auth federation, license, discovery** (lightweight).
