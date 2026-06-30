@@ -8,7 +8,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { MessageInput } from "./MessageInput";
 import { CallPanel } from "./CallPanel";
 import { formatRelativeDate, formatTime } from "@/lib/dateTime";
-import { effectiveStatus, isShownOnline } from "@/lib/presenceStatus";
+import { displayStatus, isShownOnline } from "@/lib/presenceStatus";
 import type { DirectMessage, DirectMessageThread, User, TypingUser } from "@/types";
 
 interface Props {
@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function DMChatArea({ thread, currentUser, otherUser, initialMessages }: Props) {
-  const { socket, presence, statuses } = useSocket();
+  const { socket, presence, statuses, activities } = useSocket();
   const { addToast } = useToast();
   const [messages, setMessages] = useState<DirectMessage[]>(initialMessages);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -132,12 +132,14 @@ export function DMChatArea({ thread, currentUser, otherUser, initialMessages }: 
     else groupedMessages.push({ date, messages: [msg] });
   }
 
-  const otherStatus = effectiveStatus({
+  const otherStatus = displayStatus({
     connected: presence[otherUser.id] ?? false,
     chosenStatus: statuses[otherUser.id]?.status,
+    activities: activities[otherUser.id],
   });
   const isOtherOnline = isShownOnline(otherStatus);
-  const statusLabel = otherStatus === "DND" ? "Do Not Disturb" : otherStatus === "IDLE" ? "Idle" : isOtherOnline ? "Online" : "Offline";
+  const statusLabel =
+    otherStatus === "STREAMING" ? "Streaming" : otherStatus === "DND" ? "Do Not Disturb" : otherStatus === "IDLE" ? "Idle" : isOtherOnline ? "Online" : "Offline";
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-dc-chat">

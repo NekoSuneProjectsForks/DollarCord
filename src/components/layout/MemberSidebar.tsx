@@ -6,7 +6,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { UserProfileModal } from "@/components/modals/UserProfileModal";
 import { canBanMember, canChangeRole, canRemoveMember } from "@/lib/serverPermissions";
-import { effectiveStatus, isShownOnline } from "@/lib/presenceStatus";
+import { displayStatus, isShownOnline } from "@/lib/presenceStatus";
 import type { MemberRole, ServerMember } from "@/types";
 
 interface Props {
@@ -153,9 +153,10 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
   const groups = groupByRole(filtered);
   const onlineCount = memberList.filter((member) =>
     isShownOnline(
-      effectiveStatus({
+      displayStatus({
         connected: presence[member.userId] ?? false,
         chosenStatus: statuses[member.userId]?.status ?? seed.statuses[member.userId]?.status,
+        activities: activities[member.userId] ?? seed.activities[member.userId],
         self: member.userId === currentUserId,
       })
     )
@@ -191,15 +192,19 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                 const connected = presence[member.userId] ?? false;
                 const memberStatus = statuses[member.userId]?.status ?? seed.statuses[member.userId]?.status;
                 const customStatus = statuses[member.userId]?.customStatus ?? seed.statuses[member.userId]?.customStatus;
-                const memberActivity = (activities[member.userId] ?? seed.activities[member.userId])?.[0];
-                const subtitle = memberActivity
+                const memberActivities = activities[member.userId] ?? seed.activities[member.userId];
+                const isSelf = member.userId === currentUserId;
+                const shownStatus = displayStatus({ connected, chosenStatus: memberStatus, activities: memberActivities, self: isSelf });
+                const online = isShownOnline(shownStatus);
+                const memberActivity = memberActivities?.[0];
+                // Activity/custom status only shows while online.
+                const subtitle = !online
+                  ? null
+                  : memberActivity
                   ? memberActivity.type === "CUSTOM"
                     ? memberActivity.name
                     : `${ACTIVITY_VERB[memberActivity.type] ?? "Playing"} ${memberActivity.name}`
                   : customStatus || null;
-                const isSelf = member.userId === currentUserId;
-                const shownStatus = effectiveStatus({ connected, chosenStatus: memberStatus, self: isSelf });
-                const online = isShownOnline(shownStatus);
                 const canPromote = !isSelf && canChangeRole(currentUserRole, member.role) && member.role === "MEMBER";
                 const canDemote = !isSelf && canChangeRole(currentUserRole, member.role) && member.role === "ADMIN";
                 const canKick = !isSelf && canRemoveMember(currentUserRole, member.role);

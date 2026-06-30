@@ -61,3 +61,44 @@ export async function broadcastActivities(userId: string): Promise<void> {
 export function broadcastStatus(userId: string, status: string): void {
   tryGetIO()?.emit("presence:status", { userId, status });
 }
+
+// Record a game/app sighting into the rolling history (NOT streaming). Upserts by
+// (userId, name) and bumps lastSeenAt; powers the profile "Recent activity" tab.
+export async function recordActivityHistory(
+  userId: string,
+  a: { type: string; name: string; largeImage?: string | null; details?: string | null }
+): Promise<void> {
+  if (a.type === "STREAMING" || a.type === "CUSTOM" || !a.name?.trim()) return;
+  const now = new Date();
+  try {
+    await prisma.activityHistory.upsert({
+      where: { userId_name: { userId, name: a.name } },
+      create: { userId, type: a.type, name: a.name, largeImage: a.largeImage ?? null, details: a.details ?? null, lastSeenAt: now },
+      update: { type: a.type, largeImage: a.largeImage ?? null, details: a.details ?? null, lastSeenAt: now },
+    });
+  } catch {
+    /* history is best-effort */
+  }
+}
+
+export interface ActivityHistoryDTO {
+  id: string;
+  type: string;
+  name: string;
+  largeImage: string | null;
+  details: string | null;
+  lastSeenAt: string;
+}
+
+export async function getRecentActivity(userId: string): Promise<ActivityHistoryDTO[]> {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const rows = await prisma.activityHistory.findMany({
+    where: { userId, lastSeenAt: { gt: since } },
+    orderBy: { lastSeenAt: "desc" },
+    take: 20,
+  });
+  return rows.map((r) => ({
+    id: r.id, type: r.type, name: r.name, largeImage: r.largeImage, details: r.details,
+    lastSeenAt: r.lastSeenAt.toISOString(),
+  }));
+}

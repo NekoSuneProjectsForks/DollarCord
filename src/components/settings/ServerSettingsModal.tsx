@@ -28,6 +28,7 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
   const [channels, setChannels] = useState<Channel[]>([]);
   const [automod, setAutomod] = useState({ enabled: false, blockedWords: "", maxMentions: 0, blockInvites: false });
   const [applyingTemplate, setApplyingTemplate] = useState(false);
+  const [tab, setTab] = useState<"overview" | "members" | "moderation" | "tier" | "danger">("overview");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState("");
@@ -333,9 +334,38 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
     }
   }
 
+  const isManager = currentUserRole !== "MEMBER";
+  const tabs = [
+    { id: "overview" as const, label: "Overview", show: true },
+    { id: "members" as const, label: "Roles & Members", show: isManager },
+    { id: "moderation" as const, label: "Moderation", show: isManager },
+    { id: "tier" as const, label: "Server Tier", show: true },
+    { id: "danger" as const, label: "Danger Zone", show: currentUserRole === "OWNER" },
+  ].filter((t) => t.show);
+
   return (
     <Modal open={open} onClose={onClose} title="Server Settings" size="lg">
-      <form onSubmit={handleSave} className="space-y-4 mb-6">
+      <div className="flex gap-5 min-h-[26rem]">
+        <nav className="w-40 shrink-0 space-y-0.5 border-r border-dc-border pr-2">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`block w-full rounded px-3 py-2 text-left text-sm font-medium transition-colors ${
+                tab === t.id
+                  ? "bg-dc-active text-dc-text"
+                  : `${t.id === "danger" ? "text-dc-danger" : "text-dc-muted"} hover:bg-dc-hover hover:text-dc-text`
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex-1 min-w-0 max-h-[72vh] overflow-y-auto scrollbar-thin pr-1">
+      {tab === "overview" && (
+      <form onSubmit={handleSave} className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-dc-muted uppercase tracking-wide mb-1.5">Server Name</label>
           <input
@@ -400,11 +430,12 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
           </button>
         </div>
       </form>
+      )}
 
-      <ServerPlanSection serverId={server.id} isOwner={currentUserRole === "OWNER"} />
+      {tab === "tier" && <ServerPlanSection serverId={server.id} isOwner={currentUserRole === "OWNER"} />}
 
-      {currentUserRole !== "MEMBER" && (
-        <div className="border-t border-dc-border pt-5 mb-6 space-y-5">
+      {tab === "members" && isManager && (
+        <div className="space-y-5">
           <div>
             <h3 className="text-dc-text font-semibold mb-2">Custom Roles</h3>
             <form onSubmit={handleCreateRole} className="flex flex-col sm:flex-row gap-2 mb-3">
@@ -594,8 +625,8 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
         </div>
       )}
 
-      {currentUserRole !== "MEMBER" && (
-        <div className="border-t border-dc-border pt-5 mb-6 space-y-5">
+      {tab === "moderation" && isManager && (
+        <div className="space-y-5">
           {/* AutoMod */}
           <div>
             <h3 className="text-dc-text font-semibold mb-2">AutoMod</h3>
@@ -659,8 +690,8 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
         </div>
       )}
 
-      {currentUserRole !== "MEMBER" && (
-        <div className="border-t border-dc-border pt-5 mb-6">
+      {tab === "moderation" && isManager && (
+        <div className="border-t border-dc-border pt-5 mt-5">
           <h3 className="text-dc-text font-semibold mb-2">Banned Users</h3>
           {loadingBans ? (
             <p className="text-dc-muted text-sm">Loading bans...</p>
@@ -689,8 +720,8 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
         </div>
       )}
 
-      {currentUserRole === "OWNER" && (
-        <div className="border-t border-dc-border pt-5">
+      {tab === "danger" && currentUserRole === "OWNER" && (
+        <div>
           <h3 className="text-dc-danger font-semibold mb-2">Delete Server</h3>
           <p className="text-dc-muted text-sm mb-3">
             This is irreversible. All channels, messages, and members will be permanently deleted. Type <span className="font-mono text-dc-text">{server.name}</span> to confirm.
@@ -713,6 +744,8 @@ export function ServerSettingsModal({ open, onClose, server, currentUserRole }: 
           </div>
         </div>
       )}
+        </div>
+      </div>
     </Modal>
   );
 }

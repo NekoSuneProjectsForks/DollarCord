@@ -346,15 +346,13 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
     );
 
     socket.on("disconnect", () => {
-      // Remove from any voice rooms this socket was in.
+      // Remove from any voice rooms this socket was in. Use io.to (NOT socket.to):
+      // during "disconnect" the socket has already left its rooms, so socket.to
+      // wouldn't reach the remaining peers and they'd be stuck with a ghost.
       for (const [channelId, members] of Array.from(voiceRooms.entries())) {
         if (members.has(socket.id)) {
-          leaveVoice(io, channelId, socket.id);
-          socket.to(`voice:${channelId}`).emit("voice:peer:left", { channelId, socketId: socket.id });
-          socket.broadcast.emit("voice:participants", {
-            channelId,
-            participants: roomParticipants(channelId),
-          });
+          leaveVoice(io, channelId, socket.id); // updates roster + emits voice:participants
+          io.to(`voice:${channelId}`).emit("voice:peer:left", { channelId, socketId: socket.id });
         }
       }
 

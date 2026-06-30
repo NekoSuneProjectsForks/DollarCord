@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useVoiceChannel } from "@/hooks/useVoiceChannel";
+import { useSocket } from "@/contexts/SocketContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { VoiceTextChat } from "./VoiceTextChat";
 import type { Channel, MemberRole, User } from "@/types";
@@ -60,6 +61,16 @@ function VideoTile({ stream, label, mirror }: { stream: MediaStream; label: stri
 
 export function VoiceChannelView({ channel, currentUser, currentUserRole, voiceBitrateKbps }: Props) {
   const v = useVoiceChannel(channel.id, { audioBitrateKbps: voiceBitrateKbps });
+  const { connected } = useSocket();
+  const autoJoined = useRef(false);
+  // Clicking a voice channel joins the call immediately (Discord-style), once the
+  // socket is connected. We only auto-join once; leaving won't auto-rejoin.
+  useEffect(() => {
+    if (connected && !autoJoined.current && !v.joined && !v.connecting) {
+      autoJoined.current = true;
+      void v.join();
+    }
+  }, [connected, v.joined, v.connecting, v]);
   const [showChat, setShowChat] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);

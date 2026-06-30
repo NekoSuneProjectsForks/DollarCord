@@ -318,10 +318,14 @@ export function useVoiceChannel(roomId: string, opts?: { audioBitrateKbps?: numb
         for (let i = 0; i < data.length; i++) sum += data[i];
         const avg = sum / data.length;
         const micLive = !mutedRef.current && (modeRef.current === "vad" || pttActiveRef.current);
+        // Ring only appears when real mic audio is detected (and not muted).
         const isSpeaking = micLive && avg > vadRef.current;
         if (isSpeaking !== lastSpeaking) {
           lastSpeaking = isSpeaking;
           socket?.emit("voice:speaking", { channelId: roomId, speaking: isSpeaking });
+          // Reflect our own speaking locally (we don't receive our own broadcast).
+          const myId = socket?.id;
+          if (myId) setSpeaking((prev) => ({ ...prev, [myId]: isSpeaking }));
         }
         raf = requestAnimationFrame(tick);
       };

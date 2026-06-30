@@ -48,6 +48,7 @@ model User {
   eventRsvps       ServerEventParticipant[]
   friendsRequested Friendship[]               @relation("FriendRequester")
   friendsReceived  Friendship[]               @relation("FriendAddressee")
+  activityHistory  ActivityHistory[]
   blocksMade       Block[]                    @relation("Blocker")
   blockedBy        Block[]                    @relation("Blocked")
   pollVotes        PollVote[]
@@ -590,6 +591,25 @@ model Activity {
 
   @@unique([userId, source])
   @@index([userId])
+}
+
+// Rolling history of games/apps a user has played (NOT streaming) — powers the
+// "Recent activity" tab on profiles. One row per (user, name), refreshed on each
+// sighting; queried for the last 30 days.
+model ActivityHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String   @default("PLAYING")
+  name       String
+  largeImage String?
+  details    String?
+  startedAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, lastSeenAt])
 }
 
 model PasswordResetToken {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserFromReq } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { setActivitySchema } from "@/lib/validations";
-import { broadcastActivities, getUserActivities } from "@/lib/presence";
+import { broadcastActivities, getUserActivities, recordActivityHistory } from "@/lib/presence";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUserFromReq(req);
@@ -55,6 +55,7 @@ export async function PUT(req: NextRequest) {
       },
     });
 
+    await recordActivityHistory(user.id, { type: d.type, name: d.name, largeImage: d.largeImage ?? null, details: d.details ?? null });
     await broadcastActivities(user.id);
     const activities = await getUserActivities(user.id);
     return NextResponse.json({ activities });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rpcActivitySchema } from "@/lib/validations";
-import { broadcastActivities } from "@/lib/presence";
+import { broadcastActivities, recordActivityHistory } from "@/lib/presence";
 
 // Discord-RPC-compatible Rich Presence ingest.
 //
@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await recordActivityHistory(user.id, { type, name, largeImage: activity.assets?.large_image ?? null, details: activity.details ?? null });
   await broadcastActivities(user.id);
   return NextResponse.json({ ok: true });
 }

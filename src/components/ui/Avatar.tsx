@@ -10,6 +10,8 @@ interface AvatarProps {
 }
 
 function statusDotClass(status: string | undefined, online: boolean | undefined): string {
+  // Streaming is purple and wins over the online/offline short-circuit.
+  if (status === "STREAMING") return "bg-purple-500";
   // Offline / invisible always read as gray, regardless of status value.
   if (online === false) return "bg-dc-faint";
   switch (status) {
