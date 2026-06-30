@@ -8,6 +8,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { MessageInput } from "./MessageInput";
 import { CallPanel } from "./CallPanel";
 import { formatRelativeDate, formatTime } from "@/lib/dateTime";
+import { effectiveStatus, isShownOnline } from "@/lib/presenceStatus";
 import type { DirectMessage, DirectMessageThread, User, TypingUser } from "@/types";
 
 interface Props {
@@ -18,7 +19,7 @@ interface Props {
 }
 
 export function DMChatArea({ thread, currentUser, otherUser, initialMessages }: Props) {
-  const { socket, presence } = useSocket();
+  const { socket, presence, statuses } = useSocket();
   const { addToast } = useToast();
   const [messages, setMessages] = useState<DirectMessage[]>(initialMessages);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -131,16 +132,21 @@ export function DMChatArea({ thread, currentUser, otherUser, initialMessages }: 
     else groupedMessages.push({ date, messages: [msg] });
   }
 
-  const isOtherOnline = presence[otherUser.id] ?? false;
+  const otherStatus = effectiveStatus({
+    connected: presence[otherUser.id] ?? false,
+    chosenStatus: statuses[otherUser.id]?.status,
+  });
+  const isOtherOnline = isShownOnline(otherStatus);
+  const statusLabel = otherStatus === "DND" ? "Do Not Disturb" : otherStatus === "IDLE" ? "Idle" : isOtherOnline ? "Online" : "Offline";
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-dc-chat">
       {/* Header */}
       <div className="h-12 border-b border-dc-border flex items-center px-4 gap-3 shrink-0 bg-dc-chat">
-        <Avatar user={otherUser} size="sm" online={isOtherOnline} />
+        <Avatar user={otherUser} size="sm" online={isOtherOnline} status={otherStatus} />
         <div className="flex-1 min-w-0">
           <p className="text-dc-text font-semibold text-sm">{otherUser.displayName}</p>
-          <p className="text-dc-muted text-xs">{isOtherOnline ? "Online" : "Offline"}</p>
+          <p className="text-dc-muted text-xs">{statusLabel}</p>
         </div>
         {!inCall && (
           <div className="flex items-center gap-1">

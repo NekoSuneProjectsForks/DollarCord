@@ -32,7 +32,7 @@ function LogoutIcon() {
 export function UserBar({ user, onLogout, onSettings }: Props) {
   return (
     <div className="border-t border-dc-border bg-dc-overlay px-2 py-2 flex items-center gap-2 shrink-0">
-      <Avatar user={user} size="sm" online={true} />
+      <Avatar user={user} size="sm" online={user.status !== "INVISIBLE"} status={(user.status as string) || "ONLINE"} />
       <div className="flex-1 min-w-0">
         <p className="text-dc-text text-sm font-semibold truncate">{user.displayName}</p>
         <div className="flex items-center gap-1.5 min-w-0">

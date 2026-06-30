@@ -6,6 +6,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { UserProfileModal } from "@/components/modals/UserProfileModal";
 import { canBanMember, canChangeRole, canRemoveMember } from "@/lib/serverPermissions";
+import { effectiveStatus, isShownOnline } from "@/lib/presenceStatus";
 import type { MemberRole, ServerMember } from "@/types";
 
 interface Props {
@@ -150,7 +151,15 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
   );
 
   const groups = groupByRole(filtered);
-  const onlineCount = memberList.filter((member) => presence[member.userId]).length;
+  const onlineCount = memberList.filter((member) =>
+    isShownOnline(
+      effectiveStatus({
+        connected: presence[member.userId] ?? false,
+        chosenStatus: statuses[member.userId]?.status ?? seed.statuses[member.userId]?.status,
+        self: member.userId === currentUserId,
+      })
+    )
+  ).length;
 
   return (
     <aside className="w-60 bg-dc-sidebar border-l border-dc-border flex flex-col shrink-0 overflow-hidden">
@@ -179,7 +188,7 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                 {roleLabel[role]} - {group.length}
               </p>
               {group.map((member) => {
-                const online = presence[member.userId] ?? false;
+                const connected = presence[member.userId] ?? false;
                 const memberStatus = statuses[member.userId]?.status ?? seed.statuses[member.userId]?.status;
                 const customStatus = statuses[member.userId]?.customStatus ?? seed.statuses[member.userId]?.customStatus;
                 const memberActivity = (activities[member.userId] ?? seed.activities[member.userId])?.[0];
@@ -189,6 +198,8 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                     : `${ACTIVITY_VERB[memberActivity.type] ?? "Playing"} ${memberActivity.name}`
                   : customStatus || null;
                 const isSelf = member.userId === currentUserId;
+                const shownStatus = effectiveStatus({ connected, chosenStatus: memberStatus, self: isSelf });
+                const online = isShownOnline(shownStatus);
                 const canPromote = !isSelf && canChangeRole(currentUserRole, member.role) && member.role === "MEMBER";
                 const canDemote = !isSelf && canChangeRole(currentUserRole, member.role) && member.role === "ADMIN";
                 const canKick = !isSelf && canRemoveMember(currentUserRole, member.role);
@@ -200,7 +211,7 @@ export function MemberSidebar({ members, serverId, currentUserId, currentUserRol
                     onClick={() => setSelectedUserId(member.userId)}
                     className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-dc-hover transition-colors group cursor-pointer"
                   >
-                    <Avatar user={member.user} size="sm" online={online} status={online ? memberStatus : "OFFLINE"} />
+                    <Avatar user={member.user} size="sm" online={online} status={shownStatus} />
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-medium truncate ${online ? "text-dc-text" : "text-dc-muted"}`}>
                         {member.user.displayName}

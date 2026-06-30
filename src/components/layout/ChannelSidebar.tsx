@@ -146,7 +146,9 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
     socket.emit("server:join", server.id);
 
     socket.on("server:channel:create", ({ channel }: { channel: Channel }) => {
-      setChannels((prev) => [...prev, channel].sort((a, b) => a.position - b.position));
+      setChannels((prev) =>
+        prev.some((c) => c.id === channel.id) ? prev : [...prev, channel].sort((a, b) => a.position - b.position)
+      );
     });
 
     socket.on("server:channel:update", ({ channel }: { channel: Channel }) => {
@@ -560,7 +562,9 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
         onClose={() => setShowCreate(false)}
         serverId={server.id}
         onCreated={(ch) => {
-          setChannels((prev) => [...prev, ch].sort((a, b) => a.position - b.position));
+          setChannels((prev) =>
+            prev.some((c) => c.id === ch.id) ? prev : [...prev, ch].sort((a, b) => a.position - b.position)
+          );
           router.push(`/servers/${server.id}/${ch.id}`);
         }}
       />
@@ -574,7 +578,11 @@ export function ChannelSidebar({ server, channels: initialChannels, initialEvent
         onClose={() => setShowImportTemplate(false)}
         serverId={server.id}
         onImported={(importedChannels) => {
-          setChannels((prev) => [...prev, ...importedChannels].sort((a, b) => a.position - b.position));
+          setChannels((prev) => {
+            const ids = new Set(prev.map((c) => c.id));
+            const fresh = importedChannels.filter((c) => !ids.has(c.id));
+            return [...prev, ...fresh].sort((a, b) => a.position - b.position);
+          });
           router.refresh();
         }}
       />

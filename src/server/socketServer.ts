@@ -112,10 +112,13 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
     const userId: string = socket.data.userId;
 
     socket.join(`user:${userId}`);
+
+    // Mark online BEFORE snapshotting so the connecting user sees themselves online.
+    const firstConnection = markOnline(userId);
     socket.emit("presence:snapshot", presenceSnapshot());
     socket.emit("voice:snapshot", voiceSnapshot());
 
-    if (markOnline(userId)) {
+    if (firstConnection) {
       socket.broadcast.emit("presence:update", { userId, online: true });
     }
 
