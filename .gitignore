@@ -44,6 +44,8 @@ Thumbs.db
 # Desktop agent local config (contains your RPC token)
 agent/config.json
 
-# User uploads (served from /public/uploads at runtime)
+# User uploads (served from /public/uploads at runtime; namespaced per server)
 public/uploads/*
 !public/uploads/.gitkeep
+# Custom self-host data volume (if UPLOAD_ROOT points elsewhere)
+/data/

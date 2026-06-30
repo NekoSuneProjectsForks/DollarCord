@@ -62,8 +62,15 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 - [x] Screen share (P2P video via perfect-negotiation renegotiation)
 - [x] Voice channel text chat (Discord-style attached chat panel)
 - [x] Server-mute / server-deafen by moderators (role-checked relay)
-- [ ] Webcam video (currently screen-share only) 🟡
-- [ ] Per-user volume sliders + noise-suppression controls 🟡
+- [x] Webcam video (camera toggle + multi-stream tiles alongside screen share)
+- [x] Per-user volume sliders + mic/speaker device pickers + adjustable noise gate (VAD)
+- [x] **1:1 / group DM calls** (📞/📹 in DMs, ring + incoming banner, reuses the mesh)
+- [ ] Voice regions / SFU for large rooms (mesh is fine for small groups) 🟢
+
+### 2.1b GameVox-style positioning
+- [x] Low-latency P2P voice, PTT, device selection, per-user volume, noise gate
+- [ ] Always-on overlay / global PTT outside the browser (needs desktop agent) 🟡
+- [ ] Ping/latency indicator per peer 🟢
 
 ### 2.2 Rich Presence / activity (Discord RPC analogue) 🔴
 - [x] `Activity` presence model (type, name, details, state, timestamps, assets)
@@ -235,6 +242,70 @@ Priority: 🔴 critical · 🟠 high · 🟡 medium · 🟢 nice-to-have
 
 ---
 
+## 8. Self-hosting & multi-tenancy
+
+- [x] **Per-server file/data paths** — `UPLOAD_ROOT` env; uploads namespaced
+      `<root>/<serverId>/...`. A root outside `./public` is streamed via `/api/files`.
+      One node already hosts unlimited communities (guilds) in one DB; this gives each
+      its own data directory so a single self-host can run many servers cleanly.
+- [ ] Per-tenant DB option (schema-per-tenant or DB-per-tenant) for hard isolation 🟡
+- [ ] Admin console to list/manage tenant servers + storage usage on a node 🟡
+- [ ] Move uploads to S3/R2 with per-server prefixes (cloud multi-tenancy) 🟠
+
+> Note: "more than 2 servers in one node" already works — a DollarCord instance hosts
+> any number of guilds. The new piece is per-server data directories (done) so files
+> don't comingle. Hard DB isolation per tenant is the optional next step.
+
+---
+
+## 9. Self-host licensing & launch promo — PLAN (not yet built)
+
+Goal: self-hosting is **free for lifetime if claimed before the cutoff (00:00 20 Jul)**;
+after that a one-time **$2 USD** unlocks it. Build later in a dedicated pass.
+
+Spec:
+- `License` model: `{ id, instanceId, tier (FREE_LIFETIME|PAID|TRIAL), claimedAt, cutoffAt,
+  paymentRef?, valid }`. One row per self-host instance (keyed by a generated `instanceId`).
+- **Claim flow**: on first boot, instance calls a license endpoint; if `now < cutoffAt`,
+  issue `FREE_LIFETIME` and persist. After cutoff, instance is `TRIAL` until paid.
+- **Gating**: a soft gate (banner + feature nag) rather than a hard lockout, to avoid
+  bricking self-hosts. Gate "create additional server beyond N" or premium cosmetics.
+- **Payments** (deferred — needs provider + keys): Stripe/LemonSqueezy one-time $2 checkout
+  + webhook → set `tier=PAID`, `paymentRef`. Env: `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`.
+- **License server**: a tiny hosted endpoint (this app can host it) that signs license
+  tokens (JWT/ed25519) so instances verify offline. Avoid phone-home hard dependency.
+- Decisions needed before building: payment provider; what exactly is gated; whether the
+  cutoff is wall-clock UTC; whether existing installs are grandfathered.
+
+---
+
+## 10. Matrix integration — PLAN (not yet built)
+
+Goal: bridge DollarCord with Matrix so Matrix users participate in the same rooms — "all
+in one system". Build later; needs a reachable homeserver to test.
+
+Architecture (appservice bridge, recommended):
+- Run as a **Matrix Application Service** registered with a homeserver (Synapse/Dendrite)
+  via `matrix.appservice.yaml` (`as_token`, `hs_token`, namespaces `#dollarcord_*`,
+  `@dollarcord_*`).
+- **Mapping**: DollarCord server→Matrix space; channel→Matrix room; user→ghost
+  `@dollarcord_<username>:hs`. Persist a `MatrixLink { dcChannelId, matrixRoomId }` and
+  `MatrixUserLink { dcUserId, matrixUserId }`.
+- **Relay**: DC message create → appservice `PUT /rooms/{room}/send` (as the ghost);
+  Matrix `m.room.message` (via `/transactions` push) → create a DC message (bot/ghost author).
+  Dedupe with an origin tag to prevent echo loops.
+- **Media**: upload to Matrix content repo (`/_matrix/media`) and mirror to DollarCord
+  attachments; map MXC URIs ↔ our `/api/files` URLs.
+- **Auth/identity**: optional — let real Matrix users link their account (double-puppeting)
+  for native sends; otherwise relay via a shared bot identity.
+- Modules to add: `src/bridge/matrix/{appservice,transactions,relay,mapping}.ts`,
+  config under `config/matrix.appservice.yaml`, env `MATRIX_HS_URL`, `MATRIX_AS_TOKEN`,
+  `MATRIX_HS_TOKEN`, `MATRIX_SERVER_NAME`.
+- Decisions needed: which homeserver; bridge-bot vs double-puppeting; which servers/channels
+  are bridged; E2EE rooms (bridging E2EE needs the bridge to hold keys — usually skipped).
+
+---
+
 ## 7. Status of the current iteration
 
 Shipped (all typecheck + `next build` clean):
@@ -273,10 +344,17 @@ Shipped (all typecheck + `next build` clean):
 - Role permission editor; privilege-escalation guard
 - Server discovery (`/discover`) + native server templates (export/apply) + AutoMod
 
+### Shipped in iteration 6
+- Performance: unread endpoint de-N+1'd (batched groupBy/aggregation) + message index
+- Per-server upload data paths (`UPLOAD_ROOT`, namespaced; `/api/files` fallback) for self-host
+- Webcam video in voice channels + per-user volume + mic/speaker device pickers + noise-gate slider
+- **1:1 / group DM calls** (voice + video + screen, with ring/incoming banner)
+- Plans written for self-host licensing/promo (§9) and Matrix integration (§10)
+
 ### Next up
-1. Email transport → email verification/change + real password-reset delivery.
-2. E2E-encrypted DMs and/or 2FA TOTP — remaining heavy security items.
-3. Custom emoji & stickers; full emoji picker; link unfurling.
-4. Forum/announcement landing UIs + announcement follow; slash-command framework.
+1. Self-host licensing + $2 launch promo (§9) — pick a payment provider, then build.
+2. Matrix bridge (§10) — stand up a homeserver, then build the appservice.
+3. Email transport → email verification/change + real password-reset delivery.
+4. E2E-encrypted DMs and/or 2FA TOTP — remaining heavy security items.
 
 > Live progress is tracked in the task list; checked items above are done & building.

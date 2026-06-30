@@ -383,6 +383,7 @@ model Message {
   mentions    Mention[]
 
   @@index([threadId])
+  @@index([channelId, deleted, createdAt])
 }
 
 model Attachment {

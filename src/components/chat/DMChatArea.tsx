@@ -6,6 +6,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { TypingIndicator } from "./TypingIndicator";
 import { MessageInput } from "./MessageInput";
+import { CallPanel } from "./CallPanel";
 import { formatRelativeDate, formatTime } from "@/lib/dateTime";
 import type { DirectMessage, DirectMessageThread, User, TypingUser } from "@/types";
 
@@ -23,7 +24,24 @@ export function DMChatArea({ thread, currentUser, otherUser, initialMessages }: 
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [hasMore, setHasMore] = useState(initialMessages.length === 50);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [inCall, setInCall] = useState(false);
+  const [callWithVideo, setCallWithVideo] = useState(false);
+  const [incoming, setIncoming] = useState<{ withVideo: boolean; from: { displayName: string } } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const participantIds = thread.participants.map((p) => p.user.id);
+
+  function startCall(withVideo: boolean) {
+    setCallWithVideo(withVideo);
+    setInCall(true);
+    setIncoming(null);
+    socket?.emit("dm:call:ring", { threadId: thread.id, participantIds, withVideo });
+  }
+  function acceptCall() {
+    setCallWithVideo(incoming?.withVideo ?? false);
+    setInCall(true);
+    setIncoming(null);
+  }
 
   const scrollToBottom = useCallback(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -63,11 +81,21 @@ export function DMChatArea({ thread, currentUser, otherUser, initialMessages }: 
       setTypingUsers((prev) => prev.filter((u) => u.userId !== userId));
     });
 
+    socket.on("dm:call:incoming", (data: { threadId: string; withVideo: boolean; from: { displayName: string } }) => {
+      if (data.threadId !== thread.id) return;
+      setIncoming({ withVideo: data.withVideo, from: data.from });
+    });
+    socket.on("dm:call:cancel", ({ threadId }: { threadId: string }) => {
+      if (threadId === thread.id) setIncoming(null);
+    });
+
     return () => {
       socket.emit("dm:leave", thread.id);
       socket.off("dm:message");
       socket.off("dm:typing:start");
       socket.off("dm:typing:stop");
+      socket.off("dm:call:incoming");
+      socket.off("dm:call:cancel");
     };
   }, [socket, thread.id, currentUser.id]);
 
@@ -110,11 +138,39 @@ export function DMChatArea({ thread, currentUser, otherUser, initialMessages }: 
       {/* Header */}
       <div className="h-12 border-b border-dc-border flex items-center px-4 gap-3 shrink-0 bg-dc-chat">
         <Avatar user={otherUser} size="sm" online={isOtherOnline} />
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="text-dc-text font-semibold text-sm">{otherUser.displayName}</p>
           <p className="text-dc-muted text-xs">{isOtherOnline ? "Online" : "Offline"}</p>
         </div>
+        {!inCall && (
+          <div className="flex items-center gap-1">
+            <button onClick={() => startCall(false)} className="w-8 h-8 flex items-center justify-center rounded text-dc-muted hover:text-dc-text hover:bg-dc-hover" title="Start voice call">📞</button>
+            <button onClick={() => startCall(true)} className="w-8 h-8 flex items-center justify-center rounded text-dc-muted hover:text-dc-text hover:bg-dc-hover" title="Start video call">📹</button>
+          </div>
+        )}
       </div>
+
+      {/* Incoming call banner */}
+      {incoming && !inCall && (
+        <div className="flex items-center justify-between gap-3 bg-dc-accent/15 border-b border-dc-accent/30 px-4 py-2">
+          <span className="text-sm text-dc-text">
+            📞 <span className="font-semibold">{incoming.from.displayName}</span> is calling{incoming.withVideo ? " (video)" : ""}…
+          </span>
+          <span className="flex gap-2">
+            <button onClick={acceptCall} className="rounded bg-dc-success px-3 py-1 text-xs font-semibold text-white">Join</button>
+            <button onClick={() => setIncoming(null)} className="rounded bg-dc-hover px-3 py-1 text-xs font-semibold text-dc-text">Dismiss</button>
+          </span>
+        </div>
+      )}
+
+      {inCall && (
+        <CallPanel
+          threadId={thread.id}
+          currentUser={currentUser}
+          startWithVideo={callWithVideo}
+          onClose={() => { setInCall(false); socket?.emit("dm:call:cancel", { threadId: thread.id, participantIds }); }}
+        />
+      )}
 
       {/* Messages */}
       <div ref={listRef} className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">

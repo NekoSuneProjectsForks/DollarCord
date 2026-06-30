@@ -172,6 +172,29 @@ export function initSocketServer(httpServer: HTTPServer): SocketServer {
       socket.leave(`dm:${threadId}`);
     });
 
+    // Direct calls: ring the other participants' user rooms (works even when
+    // they're not currently viewing the DM). Media uses the voice:* room keyed
+    // by the thread id.
+    socket.on(
+      "dm:call:ring",
+      ({ threadId, participantIds, withVideo }: { threadId: string; participantIds: string[]; withVideo?: boolean }) => {
+        for (const id of participantIds ?? []) {
+          if (id === userId) continue;
+          io.to(`user:${id}`).emit("dm:call:incoming", {
+            threadId,
+            withVideo: Boolean(withVideo),
+            from: { userId, username: socket.data.user.username, displayName: socket.data.user.displayName },
+          });
+        }
+      }
+    );
+
+    socket.on("dm:call:cancel", ({ threadId, participantIds }: { threadId: string; participantIds: string[] }) => {
+      for (const id of participantIds ?? []) {
+        if (id !== userId) io.to(`user:${id}`).emit("dm:call:cancel", { threadId });
+      }
+    });
+
     // Message threads
     socket.on("thread:join", (threadId: string) => {
       socket.join(`thread:${threadId}`);
