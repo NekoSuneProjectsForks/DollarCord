@@ -4,8 +4,8 @@
 
 services:
   dollarcord:
-    build: .
-    image: dollarcord:latest
+    # Pulls the published image built from the `docker` branch (GHCR).
+    image: ghcr.io/nekosuneprojectsforks/dollarcord:latest
     container_name: dollarcord
     restart: unless-stopped
     ports:
